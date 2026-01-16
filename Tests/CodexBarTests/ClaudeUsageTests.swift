@@ -299,6 +299,34 @@ struct ClaudeUsageTests {
     }
 
     @Test
+    func parsesClaudeWebAPIOrganizationsSkipsApiOnlyWhenNoChat() throws {
+        let json = """
+        [
+          { "uuid": "org-api", "name": "API Org", "capabilities": ["api"] },
+          { "uuid": "org-empty", "name": "Empty Org", "capabilities": [] }
+        ]
+        """
+        let data = Data(json.utf8)
+        let org = try ClaudeWebAPIFetcher._parseOrganizationsResponseForTesting(data)
+        #expect(org.id == "org-empty")
+        #expect(org.name == "Empty Org")
+    }
+
+    @Test
+    func parsesClaudeWebAPIOrganizationsToleratesMixedCapabilityTypes() throws {
+        let json = """
+        [
+          { "uuid": "org-api", "name": "API Org", "capabilities": ["api"] },
+          { "uuid": "org-chat", "name": "Chat Org", "capabilities": [123, { "mode": "chat" }, "chat"] }
+        ]
+        """
+        let data = Data(json.utf8)
+        let org = try ClaudeWebAPIFetcher._parseOrganizationsResponseForTesting(data)
+        #expect(org.id == "org-chat")
+        #expect(org.name == "Chat Org")
+    }
+
+    @Test
     func parsesClaudeWebAPIAccountInfo() {
         let json = """
         {

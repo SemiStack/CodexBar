@@ -595,10 +595,10 @@ public enum ClaudeWebAPIFetcher {
     private struct OrganizationResponse: Decodable {
         let uuid: String
         let name: String?
-        let capabilities: [String]?
+        let capabilities: [String]
 
         var normalizedCapabilities: Set<String> {
-            Set((self.capabilities ?? []).map { $0.lowercased() })
+            Set(self.capabilities.map { $0.lowercased() })
         }
 
         var hasChatCapability: Bool {
@@ -608,6 +608,36 @@ public enum ClaudeWebAPIFetcher {
         var isApiOnly: Bool {
             let normalized = self.normalizedCapabilities
             return !normalized.isEmpty && normalized == ["api"]
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.uuid = try container.decode(String.self, forKey: .uuid)
+            self.name = try container.decodeIfPresent(String.self, forKey: .name)
+            if let list = try? container.decode([String].self, forKey: .capabilities) {
+                self.capabilities = list
+            } else if let list = try? container.decode([CapabilityValue].self, forKey: .capabilities) {
+                self.capabilities = list.compactMap(\.stringValue)
+            } else if let single = try? container.decode(String.self, forKey: .capabilities) {
+                self.capabilities = [single]
+            } else {
+                self.capabilities = []
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case uuid
+            case name
+            case capabilities
+        }
+
+        private struct CapabilityValue: Decodable {
+            let stringValue: String?
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                self.stringValue = try? container.decode(String.self)
+            }
         }
     }
 
