@@ -43,10 +43,10 @@ export function HeroSection() {
           <div className="w-full max-w-2xl space-y-3">
             <div className="inline-flex items-center gap-3 bg-[#1a1a1a] border border-white/10 rounded-lg px-4 py-3 shadow-lg">
               <span className="text-gray-500 font-mono text-sm">$</span>
-              <code className="font-mono text-sm text-gray-300">brew install steipete/formulae/codexbar</code>
+              <code className="font-mono text-sm text-gray-300">brew install --cask steipete/tap/codexbar</code>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText("brew install steipete/formulae/codexbar")
+                  navigator.clipboard.writeText("brew install --cask steipete/tap/codexbar")
                   setCopied1(true)
                   setTimeout(() => setCopied1(false), 2000)
                 }}
@@ -61,10 +61,10 @@ export function HeroSection() {
 
             <div className="inline-flex items-center gap-3 bg-[#1a1a1a] border border-white/10 rounded-lg px-4 py-3 shadow-lg">
               <span className="text-gray-500 font-mono text-sm">$</span>
-              <code className="font-mono text-sm text-gray-300">brew install steipete/formulae/codexbar-cli</code>
+              <code className="font-mono text-sm text-gray-300">brew install steipete/tap/codexbar</code>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText("brew install steipete/formulae/codexbar-cli")
+                  navigator.clipboard.writeText("brew install steipete/tap/codexbar")
                   setCopied2(true)
                   setTimeout(() => setCopied2(false), 2000)
                 }}
@@ -83,4 +83,3 @@ export function HeroSection() {
     </main>
   )
 }
-

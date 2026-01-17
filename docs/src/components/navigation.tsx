@@ -16,19 +16,19 @@ export function Navigation() {
                 Source
               </a>
               <a
-                href="https://github.com/steipete/CodexBar/blob/main/docs/providers.md"
+                href="https://github.com/steipete/CodexBar/blob/main/docs/public/providers.md"
                 className="hover:text-white transition-colors"
               >
                 Docs
               </a>
               <a
-                href="https://github.com/steipete/CodexBar/blob/main/docs/cli.md"
+                href="https://github.com/steipete/CodexBar/blob/main/docs/public/cli.md"
                 className="hover:text-white transition-colors"
               >
                 CLI
               </a>
               <a
-                href="https://github.com/steipete/CodexBar/blob/main/docs/provider.md"
+                href="https://github.com/steipete/CodexBar/blob/main/docs/public/provider.md"
                 className="hover:text-white transition-colors"
               >
                 Provider guide
@@ -42,15 +42,14 @@ export function Navigation() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <a href="https://github.com/steipete/CodexBar/releases/tag/v0.17.0" target="_blank" rel="noopener noreferrer">
-              <Button className="bg-white text-black hover:bg-gray-100 gap-2">
+            <Button asChild className="bg-white text-black hover:bg-gray-100 gap-2">
+              <a href="https://github.com/steipete/CodexBar/releases/latest" target="_blank" rel="noopener noreferrer">
                 Download latest
-              </Button>
-            </a>
+              </a>
+            </Button>
           </div>
         </div>
       </div>
     </nav>
   )
 }
-

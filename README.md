@@ -30,22 +30,22 @@ Or download `CodexBarCLI-v<tag>-linux-<arch>.tar.gz` from GitHub Releases.
 
 ## Providers
 
-- [Codex](docs/codex.md) — Local Codex CLI RPC (+ PTY fallback) and optional OpenAI web dashboard extras.
-- [Claude](docs/claude.md) — OAuth API or browser cookies (+ CLI PTY fallback); session + weekly usage.
-- [Cursor](docs/cursor.md) — Browser session cookies for plan + usage + billing resets.
-- [Gemini](docs/gemini.md) — OAuth-backed quota API using Gemini CLI credentials (no browser cookies).
-- [Antigravity](docs/antigravity.md) — Local language server probe (experimental); no external auth.
-- [Droid](docs/factory.md) — Browser cookies + WorkOS token flows for Factory usage + billing.
-- [Copilot](docs/copilot.md) — GitHub device flow + Copilot internal usage API.
-- [z.ai](docs/zai.md) — API token (Keychain) for quota + MCP windows.
-- [Kimi](docs/kimi.md) — Auth token (JWT from `kimi-auth` cookie) for weekly quota + 5‑hour rate limit.
-- [Kimi K2](docs/kimi-k2.md) — API key for credit-based usage totals.
-- [Kiro](docs/kiro.md) — CLI-based usage via `kiro-cli /usage` command; monthly credits + bonus credits.
-- [Vertex AI](docs/vertexai.md) — Google Cloud gcloud OAuth with token cost tracking from local Claude logs.
-- [Augment](docs/augment.md) — Browser cookie-based authentication with automatic session keepalive; credits tracking and usage monitoring.
-- [Amp](docs/amp.md) — Browser cookie-based authentication with Amp Free usage tracking.
-- [JetBrains AI](docs/jetbrains.md) — Local XML-based quota from JetBrains IDE configuration; monthly credits tracking.
-- Open to new providers: [provider authoring guide](docs/provider.md).
+- [Codex](docs/public/codex.md) — Local Codex CLI RPC (+ PTY fallback) and optional OpenAI web dashboard extras.
+- [Claude](docs/public/claude.md) — OAuth API or browser cookies (+ CLI PTY fallback); session + weekly usage.
+- [Cursor](docs/public/cursor.md) — Browser session cookies for plan + usage + billing resets.
+- [Gemini](docs/public/gemini.md) — OAuth-backed quota API using Gemini CLI credentials (no browser cookies).
+- [Antigravity](docs/public/antigravity.md) — Local language server probe (experimental); no external auth.
+- [Droid](docs/public/factory.md) — Browser cookies + WorkOS token flows for Factory usage + billing.
+- [Copilot](docs/public/copilot.md) — GitHub device flow + Copilot internal usage API.
+- [z.ai](docs/public/zai.md) — API token (Keychain) for quota + MCP windows.
+- [Kimi](docs/public/kimi.md) — Auth token (JWT from `kimi-auth` cookie) for weekly quota + 5‑hour rate limit.
+- [Kimi K2](docs/public/kimi-k2.md) — API key for credit-based usage totals.
+- [Kiro](docs/public/kiro.md) — CLI-based usage via `kiro-cli /usage` command; monthly credits + bonus credits.
+- [Vertex AI](docs/public/vertexai.md) — Google Cloud gcloud OAuth with token cost tracking from local Claude logs.
+- [Augment](docs/public/augment.md) — Browser cookie-based authentication with automatic session keepalive; credits tracking and usage monitoring.
+- [Amp](docs/public/amp.md) — Browser cookie-based authentication with Amp Free usage tracking.
+- [JetBrains AI](docs/public/jetbrains.md) — Local XML-based quota from JetBrains IDE configuration; monthly credits tracking.
+- Open to new providers: [provider authoring guide](docs/public/provider.md).
 
 ## Icon & Screenshot
 The menu bar icon is a tiny two-bar meter:
@@ -88,15 +88,15 @@ Wondering if CodexBar scans your disk? It doesn’t crawl your filesystem; it re
 - **What we do not request**: no Screen Recording, Accessibility, or Automation permissions; no passwords are stored (browser cookies are reused when you opt in).
 
 ## Docs
-- Providers overview: [docs/providers.md](docs/providers.md)
-- Provider authoring: [docs/provider.md](docs/provider.md)
-- UI & icon notes: [docs/ui.md](docs/ui.md)
-- CLI reference: [docs/cli.md](docs/cli.md)
-- Architecture: [docs/architecture.md](docs/architecture.md)
-- Refresh loop: [docs/refresh-loop.md](docs/refresh-loop.md)
-- Status polling: [docs/status.md](docs/status.md)
-- Sparkle updates: [docs/sparkle.md](docs/sparkle.md)
-- Release checklist: [docs/RELEASING.md](docs/RELEASING.md)
+- Providers overview: [docs/public/providers.md](docs/public/providers.md)
+- Provider authoring: [docs/public/provider.md](docs/public/provider.md)
+- UI & icon notes: [docs/public/ui.md](docs/public/ui.md)
+- CLI reference: [docs/public/cli.md](docs/public/cli.md)
+- Architecture: [docs/public/architecture.md](docs/public/architecture.md)
+- Refresh loop: [docs/public/refresh-loop.md](docs/public/refresh-loop.md)
+- Status polling: [docs/public/status.md](docs/public/status.md)
+- Sparkle updates: [docs/public/sparkle.md](docs/public/sparkle.md)
+- Release checklist: [docs/public/RELEASING.md](docs/public/RELEASING.md)
 
 ## Getting started (dev)
 - Clone the repo and open it in Xcode or run the scripts directly.

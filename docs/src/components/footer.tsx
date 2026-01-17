@@ -25,19 +25,19 @@ export function Footer() {
                 Source
               </a>
               <a
-                href="https://github.com/steipete/CodexBar/blob/main/docs/providers.md"
+                href="https://github.com/steipete/CodexBar/blob/main/docs/public/providers.md"
                 className="text-sm text-gray-400 hover:text-white transition-colors"
               >
                 Docs
               </a>
               <a
-                href="https://github.com/steipete/CodexBar/blob/main/docs/cli.md"
+                href="https://github.com/steipete/CodexBar/blob/main/docs/public/cli.md"
                 className="text-sm text-gray-400 hover:text-white transition-colors"
               >
                 CLI
               </a>
               <a
-                href="https://github.com/steipete/CodexBar/blob/main/docs/provider.md"
+                href="https://github.com/steipete/CodexBar/blob/main/docs/public/provider.md"
                 className="text-sm text-gray-400 hover:text-white transition-colors"
               >
                 Provider guide
@@ -81,4 +81,3 @@ export function Footer() {
     </footer>
   )
 }
-
