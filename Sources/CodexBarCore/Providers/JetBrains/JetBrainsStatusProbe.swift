@@ -284,8 +284,8 @@ public struct JetBrainsStatusProbe: Sendable {
 }
 
 #if !os(macOS)
-/// Simple regex-based XML parser to avoid libxml2 dependency on Linux.
-/// Only extracts quotaInfo and nextRefill values from AIAssistantQuotaManager2 component.
+/// Lightweight XML scanner to avoid libxml2 dependency on Linux.
+/// Parses only the component/option attributes needed for JetBrains AI quota info.
 private enum JetBrainsXMLParser {
     struct ParseResult {
         let quotaInfo: String?
@@ -297,59 +297,212 @@ private enum JetBrainsXMLParser {
             return ParseResult(quotaInfo: nil, nextRefill: nil)
         }
 
-        // Find the AIAssistantQuotaManager2 component block
-        guard let componentRange = self.findComponentRange(in: content) else {
-            return ParseResult(quotaInfo: nil, nextRefill: nil)
+        var scanner = XMLScanner(content: content)
+        var quotaInfo: String?
+        var nextRefill: String?
+        var inComponent = false
+        var componentDepth = 0
+
+        while let tag = scanner.nextTag() {
+            if tag.name == "component" {
+                if tag.isEnd {
+                    if inComponent {
+                        componentDepth -= 1
+                        if componentDepth <= 0 {
+                            inComponent = false
+                            componentDepth = 0
+                        }
+                    }
+                    continue
+                }
+
+                if inComponent {
+                    componentDepth += 1
+                } else if tag.attributes["name"] == "AIAssistantQuotaManager2" {
+                    inComponent = true
+                    componentDepth = 1
+                }
+
+                continue
+            }
+
+            guard inComponent, !tag.isEnd, tag.name == "option" else { continue }
+            switch tag.attributes["name"] {
+            case "quotaInfo":
+                quotaInfo = tag.attributes["value"]
+            case "nextRefill":
+                nextRefill = tag.attributes["value"]
+            default:
+                break
+            }
         }
-
-        let componentContent = String(content[componentRange])
-
-        let quotaInfo = self.extractOptionValue(named: "quotaInfo", from: componentContent)
-        let nextRefill = self.extractOptionValue(named: "nextRefill", from: componentContent)
 
         return ParseResult(quotaInfo: quotaInfo, nextRefill: nextRefill)
     }
 
-    private static func findComponentRange(in content: String) -> Range<String.Index>? {
-        // Match <component name="AIAssistantQuotaManager2"> ... </component>
-        let pattern = #"<component[^>]*name\s*=\s*["']AIAssistantQuotaManager2["'][^>]*>[\s\S]*?</component>"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
-              let match = regex.firstMatch(
-                  in: content,
-                  options: [],
-                  range: NSRange(content.startIndex..., in: content)),
-              let range = Range(match.range, in: content)
-        else {
-            return nil
-        }
-        return range
+    private struct Tag {
+        let name: String
+        let isEnd: Bool
+        let isSelfClosing: Bool
+        let attributes: [String: String]
     }
 
-    private static func extractOptionValue(named name: String, from content: String) -> String? {
-        // Match <option name="NAME" value="VALUE"/> or <option value="VALUE" name="NAME"/>
-        let patterns = [
-            #"<option[^>]*name\s*=\s*["']\#(name)["'][^>]*value\s*=\s*["']([^"']*)["']"#,
-            #"<option[^>]*value\s*=\s*["']([^"']*)["'][^>]*name\s*=\s*["']\#(name)["']"#,
-        ]
+    private struct XMLScanner {
+        private let content: String
+        private var index: String.Index
 
-        for pattern in patterns {
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
-                  let match = regex.firstMatch(
-                      in: content,
-                      options: [],
-                      range: NSRange(content.startIndex..., in: content))
-            else {
-                continue
+        init(content: String) {
+            self.content = content
+            self.index = content.startIndex
+        }
+
+        mutating func nextTag() -> Tag? {
+            while let ltIndex = self.content[self.index...].firstIndex(of: "<") {
+                self.index = self.content.index(after: ltIndex)
+                if self.index >= self.content.endIndex { return nil }
+
+                let current = self.content[self.index]
+                if current == "!" {
+                    if self.consume(prefix: "!--") {
+                        self.skip(until: "-->")
+                    } else if self.consume(prefix: "![CDATA[") {
+                        self.skip(until: "]]>")
+                    } else {
+                        self.skip(until: ">")
+                    }
+                    continue
+                }
+
+                if current == "?" {
+                    self.skip(until: "?>")
+                    continue
+                }
+
+                if current == "/" {
+                    self.index = self.content.index(after: self.index)
+                    self.skipWhitespace()
+                    let name = self.parseName()
+                    self.skip(until: ">")
+                    return Tag(name: name, isEnd: true, isSelfClosing: false, attributes: [:])
+                }
+
+                self.skipWhitespace()
+                let name = self.parseName()
+                var attributes: [String: String] = [:]
+                var isSelfClosing = false
+
+                while self.index < self.content.endIndex {
+                    self.skipWhitespace()
+                    if self.index >= self.content.endIndex { break }
+
+                    if self.content[self.index] == "/" {
+                        let nextIndex = self.content.index(after: self.index)
+                        if nextIndex < self.content.endIndex, self.content[nextIndex] == ">" {
+                            isSelfClosing = true
+                            self.index = self.content.index(after: nextIndex)
+                            break
+                        }
+                    }
+
+                    if self.content[self.index] == ">" {
+                        self.index = self.content.index(after: self.index)
+                        break
+                    }
+
+                    let attributeName = self.parseName()
+                    if attributeName.isEmpty {
+                        self.skip(until: ">")
+                        break
+                    }
+
+                    self.skipWhitespace()
+                    var value: String?
+                    if self.index < self.content.endIndex, self.content[self.index] == "=" {
+                        self.index = self.content.index(after: self.index)
+                        self.skipWhitespace()
+                        value = self.parseAttributeValue()
+                    }
+
+                    if let value {
+                        attributes[attributeName] = value
+                    }
+                }
+
+                if !name.isEmpty {
+                    return Tag(name: name, isEnd: false, isSelfClosing: isSelfClosing, attributes: attributes)
+                }
             }
 
-            // The value is in capture group 1 for first pattern, group 1 for second pattern
-            let valueRange = match.range(at: 1)
-            if let range = Range(valueRange, in: content) {
-                return String(content[range])
+            return nil
+        }
+
+        private mutating func skipWhitespace() {
+            while self.index < self.content.endIndex, self.content[self.index].isWhitespace {
+                self.index = self.content.index(after: self.index)
             }
         }
 
-        return nil
+        private mutating func parseName() -> String {
+            let start = self.index
+            while self.index < self.content.endIndex, self.isNameChar(self.content[self.index]) {
+                self.index = self.content.index(after: self.index)
+            }
+            return String(self.content[start..<self.index])
+        }
+
+        private mutating func parseAttributeValue() -> String? {
+            guard self.index < self.content.endIndex else { return nil }
+            let quote = self.content[self.index]
+            if quote == "\"" || quote == "'" {
+                self.index = self.content.index(after: self.index)
+                let start = self.index
+                while self.index < self.content.endIndex, self.content[self.index] != quote {
+                    self.index = self.content.index(after: self.index)
+                }
+                let value = String(self.content[start..<self.index])
+                if self.index < self.content.endIndex {
+                    self.index = self.content.index(after: self.index)
+                }
+                return value
+            }
+
+            let start = self.index
+            while self.index < self.content.endIndex,
+                  !self.content[self.index].isWhitespace,
+                  self.content[self.index] != ">",
+                  self.content[self.index] != "/"
+            {
+                self.index = self.content.index(after: self.index)
+            }
+            return String(self.content[start..<self.index])
+        }
+
+        private mutating func consume(prefix: String) -> Bool {
+            let range = self.content[self.index...]
+            if range.hasPrefix(prefix) {
+                self.index = self.content.index(self.index, offsetBy: prefix.count, limitedBy: self.content.endIndex)
+                    ?? self.content.endIndex
+                return true
+            }
+            return false
+        }
+
+        private mutating func skip(until terminator: String) {
+            if let range = self.content[self.index...].range(of: terminator) {
+                self.index = range.upperBound
+            } else {
+                self.index = self.content.endIndex
+            }
+        }
+
+        private func isNameChar(_ character: Character) -> Bool {
+            character.isLetter
+                || character.isNumber
+                || character == "_"
+                || character == "-"
+                || character == ":"
+                || character == "."
+        }
     }
 }
 #endif

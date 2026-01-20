@@ -8,6 +8,7 @@
 
 ### Providers
 - Providers: add Dia browser support across cookie import and profile detection (#209). Thanks @validatedev!
+- JetBrains AI: use lightweight Linux XML scanner to avoid libxml2 dependency (#204). Thanks @oorestisime!
 
 ### Menu & Menu Bar
 - Menu: opening OpenAI web submenus triggers a refresh when the data is stale.

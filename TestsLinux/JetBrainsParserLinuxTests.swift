@@ -2,7 +2,7 @@ import CodexBarCore
 import Foundation
 import Testing
 
-/// Tests for the regex-based JetBrains XML parser used on Linux.
+/// Tests for the lightweight JetBrains XML scanner used on Linux.
 /// These tests verify that the non-libxml2 implementation correctly parses
 /// JetBrains AI Assistant quota files.
 @Suite
@@ -186,5 +186,73 @@ struct JetBrainsParserLinuxTests {
 
         #expect(snapshot.quotaInfo.type == "single")
         #expect(snapshot.quotaInfo.maximum == 10000)
+    }
+
+    @Test
+    func parsesXMLWithComments() throws {
+        let quotaInfo = "{&quot;type&quot;:&quot;comment&quot;,&quot;current&quot;:&quot;10&quot;,&quot;maximum&quot;:&quot;100&quot;}"
+
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!-- top comment -->
+        <application>
+          <component name="AIAssistantQuotaManager2">
+            <!-- inside comment -->
+            <option name="quotaInfo" value="\(quotaInfo)" />
+          </component>
+        </application>
+        """
+
+        let data = Data(xml.utf8)
+        let snapshot = try JetBrainsStatusProbe.parseXMLData(data, detectedIDE: nil)
+
+        #expect(snapshot.quotaInfo.type == "comment")
+        #expect(snapshot.quotaInfo.maximum == 100)
+    }
+
+    @Test
+    func parsesXMLWithMultipleComponentsUsesCorrectOne() throws {
+        let otherQuota = "{&quot;type&quot;:&quot;wrong&quot;,&quot;current&quot;:&quot;1&quot;,&quot;maximum&quot;:&quot;2&quot;}"
+        let quotaInfo = "{&quot;type&quot;:&quot;right&quot;,&quot;current&quot;:&quot;42&quot;,&quot;maximum&quot;:&quot;100&quot;}"
+
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <application>
+          <component name="OtherComponent">
+            <option name="quotaInfo" value="\(otherQuota)" />
+          </component>
+          <component name="AIAssistantQuotaManager2">
+            <option name="quotaInfo" value="\(quotaInfo)" />
+          </component>
+        </application>
+        """
+
+        let data = Data(xml.utf8)
+        let snapshot = try JetBrainsStatusProbe.parseXMLData(data, detectedIDE: nil)
+
+        #expect(snapshot.quotaInfo.type == "right")
+        #expect(snapshot.quotaInfo.used == 42)
+    }
+
+    @Test
+    func parsesXMLWithNextRefillBeforeQuotaInfo() throws {
+        let quotaInfo = "{&quot;type&quot;:&quot;order&quot;,&quot;current&quot;:&quot;5&quot;,&quot;maximum&quot;:&quot;50&quot;}"
+        let nextRefill = "{&quot;type&quot;:&quot;Known&quot;,&quot;next&quot;:&quot;2026-01-16T14:00:54.939Z&quot;,&quot;amount&quot;:&quot;100&quot;}"
+
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <application>
+          <component name="AIAssistantQuotaManager2">
+            <option name="nextRefill" value="\(nextRefill)" />
+            <option name="quotaInfo" value="\(quotaInfo)" />
+          </component>
+        </application>
+        """
+
+        let data = Data(xml.utf8)
+        let snapshot = try JetBrainsStatusProbe.parseXMLData(data, detectedIDE: nil)
+
+        #expect(snapshot.quotaInfo.type == "order")
+        #expect(snapshot.refillInfo?.amount == 100)
     }
 }
