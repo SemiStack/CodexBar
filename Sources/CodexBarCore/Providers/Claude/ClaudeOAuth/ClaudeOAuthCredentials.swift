@@ -1092,6 +1092,25 @@ extension ClaudeOAuthCredentialsStore {
         throw ClaudeOAuthCredentialsError.notFound
     }
 
+    private static func loadBootstrapLegacySilentFallbackAfterCandidateMiss() throws -> Data? {
+        if let legacyCandidate = self.claudeKeychainLegacyCandidateWithoutPrompt(),
+           let data = try self.loadClaudeKeychainData(candidate: legacyCandidate, allowKeychainPrompt: false),
+           !data.isEmpty
+        {
+            self.log.debug("Claude OAuth bootstrap fallback legacy keychain read succeeded without interaction")
+            return data
+        }
+
+        if let data = try self.loadClaudeKeychainLegacyData(allowKeychainPrompt: false),
+           !data.isEmpty
+        {
+            self.log.debug("Claude OAuth bootstrap fallback legacy query succeeded without interaction")
+            return data
+        }
+
+        return nil
+    }
+
     #if DEBUG
     private static func loadBootstrapFromReadOverride(didShowPreAlert: inout Bool) throws -> Data {
         self.showBootstrapPreAlertIfNeeded(&didShowPreAlert)
@@ -1123,12 +1142,25 @@ extension ClaudeOAuthCredentialsStore {
         }
 
         if let newest = self.claudeKeychainCandidatesWithoutPrompt().first {
-            return try self.loadBootstrapFromCandidate(
-                newest,
-                silentSuccessLog: "Claude OAuth bootstrap keychain read succeeded without interaction",
-                interactiveNoDataLog: "Claude OAuth bootstrap interactive keychain read returned no data",
-                interactiveFailureLog: "Claude OAuth bootstrap interactive keychain read failed",
-                didShowPreAlert: &didShowPreAlert)
+            do {
+                return try self.loadBootstrapFromCandidate(
+                    newest,
+                    silentSuccessLog: "Claude OAuth bootstrap keychain read succeeded without interaction",
+                    interactiveNoDataLog: "Claude OAuth bootstrap interactive keychain read returned no data",
+                    interactiveFailureLog: "Claude OAuth bootstrap interactive keychain read failed",
+                    didShowPreAlert: &didShowPreAlert)
+            } catch let error as ClaudeOAuthCredentialsError {
+                guard case .notFound = error else {
+                    throw error
+                }
+
+                // Keep single interactive-attempt semantics per bootstrap load.
+                // After a candidate miss, only perform legacy silent fallback probes.
+                if let fallback = try self.loadBootstrapLegacySilentFallbackAfterCandidateMiss() {
+                    return fallback
+                }
+                throw error
+            }
         }
 
         if let legacyCandidate = self.claudeKeychainLegacyCandidateWithoutPrompt() {
