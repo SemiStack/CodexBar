@@ -62,6 +62,7 @@ struct PreferencesView: View {
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
         .frame(width: self.contentWidth, height: self.contentHeight)
+        .environment(\.locale, self.settings.appLocale)
         .onAppear {
             self.updateLayout(for: self.selection.tab, animate: false)
             self.ensureValidTabSelection()

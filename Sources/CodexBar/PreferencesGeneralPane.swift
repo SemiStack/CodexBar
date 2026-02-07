@@ -15,6 +15,27 @@ struct GeneralPane: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Language")
+                                .font(.body)
+                            Text("Choose the app language used across settings and menu content.")
+                                .font(.footnote)
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        Picker("Language", selection: self.$settings.appLanguage) {
+                            ForEach(AppLanguage.allCases) { language in
+                                Text(AppLocalization.string(
+                                    AppLocalization.displayNameKey(for: language),
+                                    language: self.settings.appLanguage))
+                                    .tag(language)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: 200)
+                    }
                     PreferenceToggleRow(
                         title: "Start at Login",
                         subtitle: "Automatically opens CodexBar when you start your Mac.",

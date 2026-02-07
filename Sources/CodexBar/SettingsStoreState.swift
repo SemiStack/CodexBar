@@ -1,6 +1,7 @@
 import Foundation
 
 struct SettingsDefaultsState: Sendable {
+    var appLanguageRaw: String
     var refreshFrequency: RefreshFrequency
     var launchAtLogin: Bool
     var debugMenuEnabled: Bool

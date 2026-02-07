@@ -3,6 +3,18 @@ import Foundation
 import ServiceManagement
 
 extension SettingsStore {
+    var appLanguage: AppLanguage {
+        get { AppLanguage(rawValue: self.defaultsState.appLanguageRaw) ?? .system }
+        set {
+            self.defaultsState.appLanguageRaw = newValue.rawValue
+            self.userDefaults.set(newValue.rawValue, forKey: AppLanguage.defaultsKey)
+        }
+    }
+
+    var appLocale: Locale {
+        AppLocalization.locale(for: self.appLanguage)
+    }
+
     var refreshFrequency: RefreshFrequency {
         get { self.defaultsState.refreshFrequency }
         set {

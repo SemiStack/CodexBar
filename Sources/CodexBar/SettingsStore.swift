@@ -28,12 +28,14 @@ enum RefreshFrequency: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .manual: "Manual"
-        case .oneMinute: "1 min"
-        case .twoMinutes: "2 min"
-        case .fiveMinutes: "5 min"
-        case .fifteenMinutes: "15 min"
-        case .thirtyMinutes: "30 min"
+        case .manual: AppLocalization.string("RefreshFrequency.Manual", language: AppLocalization.selectedLanguage())
+        case .oneMinute: AppLocalization.string("RefreshFrequency.OneMinute", language: AppLocalization.selectedLanguage())
+        case .twoMinutes: AppLocalization.string("RefreshFrequency.TwoMinutes", language: AppLocalization.selectedLanguage())
+        case .fiveMinutes: AppLocalization.string("RefreshFrequency.FiveMinutes", language: AppLocalization.selectedLanguage())
+        case .fifteenMinutes:
+            AppLocalization.string("RefreshFrequency.FifteenMinutes", language: AppLocalization.selectedLanguage())
+        case .thirtyMinutes:
+            AppLocalization.string("RefreshFrequency.ThirtyMinutes", language: AppLocalization.selectedLanguage())
         }
     }
 }
@@ -50,10 +52,10 @@ enum MenuBarMetricPreference: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .automatic: "Automatic"
-        case .primary: "Primary"
-        case .secondary: "Secondary"
-        case .average: "Average"
+        case .automatic: AppLocalization.string("Metric.Automatic", language: AppLocalization.selectedLanguage())
+        case .primary: AppLocalization.string("Metric.Primary", language: AppLocalization.selectedLanguage())
+        case .secondary: AppLocalization.string("Metric.Secondary", language: AppLocalization.selectedLanguage())
+        case .average: AppLocalization.string("Metric.Average", language: AppLocalization.selectedLanguage())
         }
     }
 }
@@ -156,6 +158,7 @@ final class SettingsStore {
 
 extension SettingsStore {
     private static func loadDefaultsState(userDefaults: UserDefaults) -> SettingsDefaultsState {
+        let appLanguageRaw = userDefaults.string(forKey: AppLanguage.defaultsKey) ?? AppLanguage.system.rawValue
         let refreshRaw = userDefaults.string(forKey: "refreshFrequency") ?? RefreshFrequency.fiveMinutes.rawValue
         let refreshFrequency = RefreshFrequency(rawValue: refreshRaw) ?? .fiveMinutes
         let launchAtLogin = userDefaults.object(forKey: "launchAtLogin") as? Bool ?? false
@@ -217,6 +220,7 @@ extension SettingsStore {
         let providerDetectionCompleted = userDefaults.object(forKey: "providerDetectionCompleted") as? Bool ?? false
 
         return SettingsDefaultsState(
+            appLanguageRaw: appLanguageRaw,
             refreshFrequency: refreshFrequency,
             launchAtLogin: launchAtLogin,
             debugMenuEnabled: debugMenuEnabled,
