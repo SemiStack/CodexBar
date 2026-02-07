@@ -11,20 +11,20 @@ struct GeneralPane: View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 16) {
                 SettingsSection(contentSpacing: 12) {
-                    Text("System")
+                    Text("System".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Language")
+                            Text("Language".appLocalized)
                                 .font(.body)
-                            Text("Choose the app language used across settings and menu content.")
+                            Text("Choose the app language used across settings and menu content.".appLocalized)
                                 .font(.footnote)
                                 .foregroundStyle(.tertiary)
                         }
                         Spacer()
-                        Picker("Language", selection: self.$settings.appLanguage) {
+                        Picker("Language".appLocalized, selection: self.$settings.appLanguage) {
                             ForEach(AppLanguage.allCases) { language in
                                 Text(AppLocalization.string(
                                     AppLocalization.displayNameKey(for: language),
@@ -45,7 +45,7 @@ struct GeneralPane: View {
                 Divider()
 
                 SettingsSection(contentSpacing: 12) {
-                    Text("Usage")
+                    Text("Usage".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
@@ -64,7 +64,7 @@ struct GeneralPane: View {
                                 .fixedSize(horizontal: false, vertical: true)
 
                             if self.settings.costUsageEnabled {
-                                Text("Auto-refresh: hourly · Timeout: 10m")
+                                Text("Auto-refresh: hourly · Timeout: 10m".appLocalized)
                                     .font(.footnote)
                                     .foregroundStyle(.tertiary)
 
@@ -78,21 +78,21 @@ struct GeneralPane: View {
                 Divider()
 
                 SettingsSection(contentSpacing: 12) {
-                    Text("Automation")
+                    Text("Automation".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .top, spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Refresh cadence")
+                                Text("Refresh cadence".appLocalized)
                                     .font(.body)
-                                Text("How often CodexBar polls providers in the background.")
+                                Text("How often CodexBar polls providers in the background.".appLocalized)
                                     .font(.footnote)
                                     .foregroundStyle(.tertiary)
                             }
                             Spacer()
-                            Picker("Refresh cadence", selection: self.$settings.refreshFrequency) {
+                            Picker("Refresh cadence".appLocalized, selection: self.$settings.refreshFrequency) {
                                 ForEach(RefreshFrequency.allCases) { option in
                                     Text(option.label).tag(option)
                                 }
@@ -102,7 +102,7 @@ struct GeneralPane: View {
                             .frame(maxWidth: 200)
                         }
                         if self.settings.refreshFrequency == .manual {
-                            Text("Auto-refresh is off; use the menu's Refresh command.")
+                            Text("Auto-refresh is off; use the menu's Refresh command.".appLocalized)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -124,7 +124,7 @@ struct GeneralPane: View {
                 SettingsSection(contentSpacing: 12) {
                     HStack {
                         Spacer()
-                        Button("Quit CodexBar") { NSApp.terminate(nil) }
+                        Button("Quit CodexBar".appLocalized) { NSApp.terminate(nil) }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
                     }

@@ -604,7 +604,8 @@ extension UsageMenuCardView.Model {
             account: input.account,
             metadata: input.metadata)
         let metrics = Self.metrics(input: input)
-        let creditsText: String? = if input.provider == .codex, !input.showOptionalCreditsAndExtraUsage {
+        // Hide Codex credits block in the menu card; manual refresh remains available from header row.
+        let creditsText: String? = if input.provider == .codex {
             nil
         } else {
             Self.creditsLine(metadata: input.metadata, credits: input.credits, error: input.creditsError)
@@ -636,7 +637,7 @@ extension UsageMenuCardView.Model {
             planText: planText,
             metrics: metrics,
             creditsText: creditsText,
-            creditsRemaining: input.credits?.remaining,
+            creditsRemaining: input.provider == .codex ? nil : input.credits?.remaining,
             creditsHintText: redacted.creditsHintText,
             creditsHintCopyText: redacted.creditsHintCopyText,
             providerCost: providerCost,

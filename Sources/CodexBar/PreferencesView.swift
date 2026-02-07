@@ -34,34 +34,35 @@ struct PreferencesView: View {
     var body: some View {
         TabView(selection: self.$selection.tab) {
             GeneralPane(settings: self.settings, store: self.store)
-                .tabItem { Label("General", systemImage: "gearshape") }
+                .tabItem { Label("General".appLocalized, systemImage: "gearshape") }
                 .tag(PreferencesTab.general)
 
             ProvidersPane(settings: self.settings, store: self.store)
-                .tabItem { Label("Providers", systemImage: "square.grid.2x2") }
+                .tabItem { Label("Providers".appLocalized, systemImage: "square.grid.2x2") }
                 .tag(PreferencesTab.providers)
 
             DisplayPane(settings: self.settings)
-                .tabItem { Label("Display", systemImage: "eye") }
+                .tabItem { Label("Display".appLocalized, systemImage: "eye") }
                 .tag(PreferencesTab.display)
 
             AdvancedPane(settings: self.settings)
-                .tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
+                .tabItem { Label("Advanced".appLocalized, systemImage: "slider.horizontal.3") }
                 .tag(PreferencesTab.advanced)
 
             AboutPane(updater: self.updater)
-                .tabItem { Label("About", systemImage: "info.circle") }
+                .tabItem { Label("About".appLocalized, systemImage: "info.circle") }
                 .tag(PreferencesTab.about)
 
             if self.settings.debugMenuEnabled {
                 DebugPane(settings: self.settings, store: self.store)
-                    .tabItem { Label("Debug", systemImage: "ladybug") }
+                    .tabItem { Label("Debug".appLocalized, systemImage: "ladybug") }
                     .tag(PreferencesTab.debug)
             }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
         .frame(width: self.contentWidth, height: self.contentHeight)
+        .id(self.settings.appLanguage)
         .environment(\.locale, self.settings.appLocale)
         .onAppear {
             self.updateLayout(for: self.selection.tab, animate: false)

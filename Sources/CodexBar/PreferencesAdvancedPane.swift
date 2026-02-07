@@ -11,17 +11,17 @@ struct AdvancedPane: View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 16) {
                 SettingsSection(contentSpacing: 8) {
-                    Text("Keyboard shortcut")
+                    Text("Keyboard shortcut".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
                     HStack(alignment: .center, spacing: 12) {
-                        Text("Open menu")
+                        Text("Open menu".appLocalized)
                             .font(.body)
                         Spacer()
                         KeyboardShortcuts.Recorder(for: .openMenu)
                     }
-                    Text("Trigger the menu bar menu from anywhere.")
+                    Text("Trigger the menu bar menu from anywhere.".appLocalized)
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
                 }
@@ -36,7 +36,7 @@ struct AdvancedPane: View {
                             if self.isInstallingCLI {
                                 ProgressView().controlSize(.small)
                             } else {
-                                Text("Install CLI")
+                                Text("Install CLI".appLocalized)
                             }
                         }
                         .disabled(self.isInstallingCLI)
@@ -48,7 +48,7 @@ struct AdvancedPane: View {
                                 .lineLimit(2)
                         }
                     }
-                    Text("Symlink CodexBarCLI to /usr/local/bin and /opt/homebrew/bin as codexbar.")
+                    Text("Symlink CodexBarCLI to /usr/local/bin and /opt/homebrew/bin as codexbar.".appLocalized)
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
                 }
@@ -79,10 +79,7 @@ struct AdvancedPane: View {
 
                 SettingsSection(
                     title: "Keychain access",
-                    caption: """
-                    Disable all Keychain reads and writes. Browser cookie import is unavailable; paste Cookie \
-                    headers manually in Providers.
-                    """) {
+                    caption: "Disable all Keychain reads and writes. Browser cookie import is unavailable; paste Cookie headers manually in Providers.") {
                         PreferenceToggleRow(
                             title: "Disable Keychain access",
                             subtitle: "Prevents any Keychain access while enabled.",

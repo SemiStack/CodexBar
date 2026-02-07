@@ -35,4 +35,5 @@ struct HiddenWindowView: View {
                 }
             }
     }
+
 }

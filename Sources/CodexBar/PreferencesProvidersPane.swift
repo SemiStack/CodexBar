@@ -48,7 +48,7 @@ struct ProvidersPane: View {
                         }
                     })
             } else {
-                Text("Select a provider")
+                Text("Select a provider".appLocalized)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }

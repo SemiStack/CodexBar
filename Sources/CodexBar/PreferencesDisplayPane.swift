@@ -8,7 +8,7 @@ struct DisplayPane: View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 16) {
                 SettingsSection(contentSpacing: 12) {
-                    Text("Menu bar")
+                    Text("Menu bar".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
@@ -34,14 +34,14 @@ struct DisplayPane: View {
                         binding: self.$settings.menuBarShowsBrandIconWithPercent)
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Display mode")
+                            Text("Display mode".appLocalized)
                                 .font(.body)
-                            Text("Choose what to show in the menu bar (Pace shows usage vs. expected).")
+                            Text("Choose what to show in the menu bar (Pace shows usage vs. expected).".appLocalized)
                                 .font(.footnote)
                                 .foregroundStyle(.tertiary)
                         }
                         Spacer()
-                        Picker("Display mode", selection: self.$settings.menuBarDisplayMode) {
+                        Picker("Display mode".appLocalized, selection: self.$settings.menuBarDisplayMode) {
                             ForEach(MenuBarDisplayMode.allCases) { mode in
                                 Text(mode.label).tag(mode)
                             }
@@ -57,7 +57,7 @@ struct DisplayPane: View {
                 Divider()
 
                 SettingsSection(contentSpacing: 12) {
-                    Text("Menu content")
+                    Text("Menu content".appLocalized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)

@@ -47,9 +47,7 @@ enum AppLocalization {
     }
 
     static func string(_ key: String, language: AppLanguage) -> String {
-        guard let bundle = self.bundle(for: language) else {
-            return Bundle.main.localizedString(forKey: key, value: key, table: nil)
-        }
+        let bundle = self.bundle(for: language) ?? self.localizationBundle
         return bundle.localizedString(forKey: key, value: key, table: nil)
     }
 
@@ -70,13 +68,47 @@ enum AppLocalization {
     }
 
     private static func bundle(for language: AppLanguage) -> Bundle? {
-        guard let identifier = language.localeIdentifier,
-              let path = Bundle.main.path(forResource: identifier, ofType: "lproj"),
-              let bundle = Bundle(path: path)
-        else {
-            return nil
+        guard let identifier = language.localeIdentifier else {
+            return self.localizationBundle
         }
-        return bundle
+        let resourceNames = self.candidateResourceNames(for: identifier)
+        for base in self.candidateBundles {
+            for resource in resourceNames {
+                if let path = base.path(forResource: resource, ofType: "lproj"),
+                   let bundle = Bundle(path: path)
+                {
+                    return bundle
+                }
+            }
+        }
+        return nil
+    }
+
+    private static var localizationBundle: Bundle {
+        #if SWIFT_PACKAGE
+        return .module
+        #else
+        return .main
+        #endif
+    }
+
+    private static var candidateBundles: [Bundle] {
+        let primary = self.localizationBundle
+        if primary.bundleURL == Bundle.main.bundleURL {
+            return [primary]
+        }
+        return [primary, .main]
+    }
+
+    private static func candidateResourceNames(for identifier: String) -> [String] {
+        var names: [String] = [identifier]
+        let lower = identifier.lowercased()
+        if !names.contains(lower) { names.append(lower) }
+        let underscore = identifier.replacingOccurrences(of: "-", with: "_")
+        if !names.contains(underscore) { names.append(underscore) }
+        let underscoreLower = underscore.lowercased()
+        if !names.contains(underscoreLower) { names.append(underscoreLower) }
+        return names
     }
 }
 

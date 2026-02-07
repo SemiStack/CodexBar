@@ -6,8 +6,16 @@ extension SettingsStore {
     var appLanguage: AppLanguage {
         get { AppLanguage(rawValue: self.defaultsState.appLanguageRaw) ?? .system }
         set {
-            self.defaultsState.appLanguageRaw = newValue.rawValue
+            let previous = self.defaultsState.appLanguageRaw
+            var next = self.defaultsState
+            next.appLanguageRaw = newValue.rawValue
+            self.defaultsState = next
             self.userDefaults.set(newValue.rawValue, forKey: AppLanguage.defaultsKey)
+            if previous != newValue.rawValue {
+                CodexBarLog.logger(LogCategories.settings).info(
+                    "App language updated",
+                    metadata: ["language": newValue.rawValue])
+            }
         }
     }
 

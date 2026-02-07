@@ -81,6 +81,7 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
     private var lastProviderOrder: [UsageProvider]
     private var lastMergeIcons: Bool
     private var lastSwitcherShowsIcons: Bool
+    private var lastAppLanguage: AppLanguage
     /// Tracks which providers the merged menu's switcher was built with, to detect when it needs full rebuild.
     var lastSwitcherProviders: [UsageProvider] = []
     let loginLogger = CodexBarLog.logger(LogCategories.login)
@@ -152,6 +153,7 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
         self.lastProviderOrder = settings.providerOrder
         self.lastMergeIcons = settings.mergeIcons
         self.lastSwitcherShowsIcons = settings.switcherShowsIcons
+        self.lastAppLanguage = settings.appLanguage
         self.statusBar = statusBar
         let item = statusBar.statusItem(withLength: NSStatusItem.variableLength)
         // Ensure the icon is rendered at 1:1 without resampling (crisper edges for template images).
@@ -289,6 +291,11 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
         let showsIcons = self.settings.switcherShowsIcons
         if showsIcons != self.lastSwitcherShowsIcons {
             self.lastSwitcherShowsIcons = showsIcons
+            shouldRefresh = true
+        }
+        let appLanguage = self.settings.appLanguage
+        if appLanguage != self.lastAppLanguage {
+            self.lastAppLanguage = appLanguage
             shouldRefresh = true
         }
         return shouldRefresh

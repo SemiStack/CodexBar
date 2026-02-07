@@ -143,12 +143,48 @@ extension StatusItemController {
     private func openSettings(tab: PreferencesTab) {
         DispatchQueue.main.async {
             self.preferencesSelection.tab = tab
-            NSApp.activate(ignoringOtherApps: true)
-            NotificationCenter.default.post(
-                name: .codexbarOpenSettings,
-                object: nil,
-                userInfo: ["tab": tab.rawValue])
+            // Delay a tick so the menu tracking loop fully exits before opening Settings.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NSApp.activate(ignoringOtherApps: true)
+                NotificationCenter.default.post(
+                    name: .codexbarOpenSettings,
+                    object: nil,
+                    userInfo: ["tab": tab.rawValue])
+                _ = NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                _ = NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+                self.bringSettingsWindowToFront()
+            }
         }
+    }
+
+    private func bringSettingsWindowToFront() {
+        let delays: [TimeInterval] = [0.0, 0.1, 0.25]
+        for delay in delays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                NSApp.activate(ignoringOtherApps: true)
+                NSRunningApplication.current.activate(options: [.activateAllWindows])
+                guard let settingsWindow = NSApp.windows.first(where: { self.isInteractiveSettingsWindow($0) }) else {
+                    return
+                }
+                let previousLevel = settingsWindow.level
+                settingsWindow.level = .floating
+                settingsWindow.orderFrontRegardless()
+                settingsWindow.makeKeyAndOrderFront(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if settingsWindow.level == .floating {
+                        settingsWindow.level = previousLevel
+                    }
+                }
+            }
+        }
+    }
+
+    private func isInteractiveSettingsWindow(_ window: NSWindow) -> Bool {
+        guard window.title != "CodexBarLifecycleKeepalive" else { return false }
+        guard window.canBecomeKey else { return false }
+        guard !window.ignoresMouseEvents else { return false }
+        guard window.alphaValue > 0.01 else { return false }
+        return window.isVisible || !window.isMiniaturized
     }
 
     @objc func quit() {
