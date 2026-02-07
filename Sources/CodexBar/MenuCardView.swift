@@ -180,12 +180,56 @@ struct UsageMenuCardView: View {
         .padding(.horizontal, 16)
         .padding(.top, 2)
         .padding(.bottom, 2)
-        .frame(width: self.width, alignment: .leading)
+        .frame(width: self.contentWidth, alignment: .leading)
+        .background {
+            if self.showsAccountBoundary {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(self.accountBoundaryFill)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(self.accountBoundaryStroke, lineWidth: 1)
+            }
+        }
+        .padding(.horizontal, self.horizontalInset)
+        .padding(.vertical, self.showsAccountBoundary ? 2 : 0)
     }
 
     private var hasDetails: Bool {
         !self.model.metrics.isEmpty || self.model.placeholder != nil || self.model.tokenUsage != nil ||
             self.model.providerCost != nil
+    }
+
+    private var showsAccountBoundary: Bool {
+        self.model.accountSelectionState != .none
+    }
+
+    private var horizontalInset: CGFloat {
+        self.showsAccountBoundary ? 6 : 0
+    }
+
+    private var contentWidth: CGFloat {
+        max(1, self.width - self.horizontalInset * 2)
+    }
+
+    private var accountBoundaryFill: Color {
+        switch self.model.accountSelectionState {
+        case .none:
+            .clear
+        case .selected:
+            self.model.progressColor.opacity(self.isHighlighted ? 0.2 : 0.12)
+        case .unselected:
+            MenuHighlightStyle.secondary(self.isHighlighted).opacity(self.isHighlighted ? 0.2 : 0.08)
+        }
+    }
+
+    private var accountBoundaryStroke: Color {
+        switch self.model.accountSelectionState {
+        case .none:
+            .clear
+        case .selected:
+            self.model.progressColor.opacity(self.isHighlighted ? 0.85 : 0.65)
+        case .unselected:
+            MenuHighlightStyle.secondary(self.isHighlighted).opacity(self.isHighlighted ? 0.55 : 0.35)
+        }
     }
 }
 
@@ -199,10 +243,19 @@ private struct UsageMenuCardHeaderView: View {
                 Text(self.model.providerName)
                     .font(.headline)
                     .fontWeight(.semibold)
+                    .foregroundStyle(self.providerTitleColor)
                 Spacer()
                 Text(self.model.email)
-                    .font(.subheadline)
-                    .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                    .font(.subheadline.weight(self.model.accountSelectionState == .none ? .regular : .semibold))
+                    .foregroundStyle(self.accountNameColor)
+                    .padding(.horizontal, self.model.accountSelectionState == .none ? 0 : 8)
+                    .padding(.vertical, self.model.accountSelectionState == .none ? 0 : 2)
+                    .background {
+                        if self.model.accountSelectionState != .none {
+                            Capsule(style: .continuous)
+                                .fill(self.accountNameBackground)
+                        }
+                    }
             }
             let subtitleAlignment: VerticalAlignment = self.model.subtitleStyle == .error ? .top : .firstTextBaseline
             HStack(alignment: subtitleAlignment) {
@@ -224,7 +277,7 @@ private struct UsageMenuCardHeaderView: View {
                 case .selected:
                     Image(systemName: "checkmark.circle.fill")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(self.model.progressColor)
                 case .unselected:
                     Image(systemName: "circle")
                         .font(.footnote.weight(.semibold))
@@ -245,6 +298,39 @@ private struct UsageMenuCardHeaderView: View {
         case .info: MenuHighlightStyle.secondary(self.isHighlighted)
         case .loading: MenuHighlightStyle.secondary(self.isHighlighted)
         case .error: MenuHighlightStyle.error(self.isHighlighted)
+        }
+    }
+
+    private var providerTitleColor: Color {
+        switch self.model.accountSelectionState {
+        case .none:
+            MenuHighlightStyle.primary(self.isHighlighted)
+        case .selected:
+            self.model.progressColor
+        case .unselected:
+            MenuHighlightStyle.primary(self.isHighlighted)
+        }
+    }
+
+    private var accountNameColor: Color {
+        switch self.model.accountSelectionState {
+        case .none:
+            MenuHighlightStyle.secondary(self.isHighlighted)
+        case .selected:
+            self.model.progressColor
+        case .unselected:
+            MenuHighlightStyle.primary(self.isHighlighted)
+        }
+    }
+
+    private var accountNameBackground: Color {
+        switch self.model.accountSelectionState {
+        case .none:
+            .clear
+        case .selected:
+            self.model.progressColor.opacity(self.isHighlighted ? 0.22 : 0.14)
+        case .unselected:
+            MenuHighlightStyle.secondary(self.isHighlighted).opacity(self.isHighlighted ? 0.2 : 0.1)
         }
     }
 }

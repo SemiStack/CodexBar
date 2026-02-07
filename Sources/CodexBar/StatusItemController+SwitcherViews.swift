@@ -33,6 +33,7 @@ final class ProviderSwitcherView: NSView {
     private var preferredWidth: CGFloat = 0
     private var hoveredButtonTag: Int?
     private let lightModeOverlayLayer = CALayer()
+    private let segmentGap: CGFloat = 8
 
     init(
         providers: [UsageProvider],
@@ -43,7 +44,7 @@ final class ProviderSwitcherView: NSView {
         weeklyRemainingProvider: @escaping (UsageProvider) -> Double?,
         onSelect: @escaping (UsageProvider) -> Void)
     {
-        let minimumGap: CGFloat = 1
+        let minimumGap: CGFloat = self.segmentGap
         self.segments = providers.map { provider in
             let fullTitle = Self.switcherTitle(for: provider)
             let icon = iconProvider(provider)
@@ -58,7 +59,7 @@ final class ProviderSwitcherView: NSView {
         self.onSelect = onSelect
         self.showsIcons = showsIcons
         self.weeklyRemainingProvider = weeklyRemainingProvider
-        self.stackedIcons = showsIcons && providers.count > 3
+        self.stackedIcons = false
         let initialOuterPadding = Self.switcherOuterPadding(
             for: width,
             count: self.segments.count,
@@ -68,17 +69,10 @@ final class ProviderSwitcherView: NSView {
             count: self.segments.count,
             outerPadding: initialOuterPadding,
             minimumGap: minimumGap)
-        self.rowCount = Self.switcherRowCount(
-            width: width,
-            count: self.segments.count,
-            maxAllowedSegmentWidth: initialMaxAllowedSegmentWidth,
-            stackedIcons: self.stackedIcons)
-        self.rowSpacing = self.stackedIcons ? 4 : 2
-        if self.stackedIcons && self.rowCount >= 3 {
-            self.rowHeight = 40
-        } else {
-            self.rowHeight = self.stackedIcons ? 36 : 30
-        }
+        _ = initialMaxAllowedSegmentWidth
+        self.rowCount = 1
+        self.rowSpacing = 0
+        self.rowHeight = 30
         let height: CGFloat = self.rowHeight * CGFloat(self.rowCount)
             + self.rowSpacing * CGFloat(max(0, self.rowCount - 1))
         self.preferredWidth = width
@@ -163,16 +157,18 @@ final class ProviderSwitcherView: NSView {
         }
 
         let uniformWidth: CGFloat
-        if self.rowCount > 1 || !self.stackedIcons {
+        if self.rowCount > 1 {
             uniformWidth = self.applyUniformSegmentWidth(maxAllowedWidth: maxAllowedSegmentWidth)
             if uniformWidth > 0 {
                 self.segmentWidths = Array(repeating: uniformWidth, count: self.buttons.count)
             }
-        } else {
+        } else if self.stackedIcons {
             self.segmentWidths = self.applyNonUniformSegmentWidths(
                 totalWidth: width,
                 outerPadding: outerPadding,
                 minimumGap: minimumGap)
+            uniformWidth = 0
+        } else {
             uniformWidth = 0
         }
 
@@ -244,6 +240,11 @@ final class ProviderSwitcherView: NSView {
         minimumGap: CGFloat,
         uniformWidth: CGFloat)
     {
+        if self.rowCount == 1 {
+            self.applyEqualSingleRowLayout(outerPadding: outerPadding, gap: minimumGap)
+            return
+        }
+
         if self.rowCount > 1 {
             self.applyMultiRowLayout(
                 rowCount: self.rowCount,
@@ -337,6 +338,40 @@ final class ProviderSwitcherView: NSView {
             NSLayoutConstraint.activate([
                 first.centerXAnchor.constraint(equalTo: self.centerXAnchor),
                 first.centerYAnchor.constraint(equalTo: self.centerYAnchor),
+            ])
+        }
+    }
+
+    private func applyEqualSingleRowLayout(outerPadding: CGFloat, gap: CGFloat) {
+        guard !self.buttons.isEmpty else { return }
+
+        for button in self.buttons {
+            NSLayoutConstraint.activate([
+                button.topAnchor.constraint(equalTo: self.topAnchor),
+                button.bottomAnchor.constraint(equalTo: self.bottomAnchor),
+            ])
+        }
+
+        if self.buttons.count == 1 {
+            NSLayoutConstraint.activate([
+                self.buttons[0].leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: outerPadding),
+                self.buttons[0].trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -outerPadding),
+            ])
+            return
+        }
+
+        NSLayoutConstraint.activate([
+            self.buttons[0].leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: outerPadding),
+            self.buttons[self.buttons.count - 1]
+                .trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -outerPadding),
+        ])
+
+        for index in 1..<self.buttons.count {
+            let previous = self.buttons[index - 1]
+            let current = self.buttons[index]
+            NSLayoutConstraint.activate([
+                current.leadingAnchor.constraint(equalTo: previous.trailingAnchor, constant: gap),
+                current.widthAnchor.constraint(equalTo: self.buttons[0].widthAnchor),
             ])
         }
     }
