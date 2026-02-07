@@ -108,6 +108,15 @@
 "Enabled" = "Enabled";
 "Refreshing" = "Refreshing";
 "Not fetched yet" = "Not fetched yet";
+"Antigravity language server not detected. Launch Antigravity and retry." = "Antigravity language server not detected. Launch Antigravity and retry.";
+"Antigravity CSRF token not found. Restart Antigravity and retry." = "Antigravity CSRF token not found. Restart Antigravity and retry.";
+"Could not parse Antigravity quota: %@" = "Could not parse Antigravity quota: %@";
+"Antigravity quota request timed out." = "Antigravity quota request timed out.";
+"Antigravity port detection needs lsof. Install it, then retry." = "Antigravity port detection needs lsof. Install it, then retry.";
+"Antigravity is running but not exposing ports yet. Try again in a few seconds." = "Antigravity is running but not exposing ports yet. Try again in a few seconds.";
+"Antigravity port detection failed: %@" = "Antigravity port detection failed: %@";
+"Antigravity session expired. Restart Antigravity and retry." = "Antigravity session expired. Restart Antigravity and retry.";
+"Antigravity API error: %@" = "Antigravity API error: %@";
 "not detected" = "not detected";
 "Refresh" = "Refresh";
 "Drag to reorder" = "Drag to reorder";

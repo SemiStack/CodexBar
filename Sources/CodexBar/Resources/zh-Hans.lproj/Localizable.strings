@@ -109,6 +109,15 @@
 "Enabled" = "已启用";
 "Refreshing" = "刷新中";
 "Not fetched yet" = "尚未抓取";
+"Antigravity language server not detected. Launch Antigravity and retry." = "未检测到 Antigravity 语言服务器。请启动 Antigravity 后重试。";
+"Antigravity CSRF token not found. Restart Antigravity and retry." = "未找到 Antigravity CSRF 令牌。请重启 Antigravity 后重试。";
+"Could not parse Antigravity quota: %@" = "无法解析 Antigravity 配额：%@";
+"Antigravity quota request timed out." = "Antigravity 配额请求超时。";
+"Antigravity port detection needs lsof. Install it, then retry." = "检测 Antigravity 端口需要 lsof，请先安装后重试。";
+"Antigravity is running but not exposing ports yet. Try again in a few seconds." = "Antigravity 已运行但尚未开放端口，请几秒后重试。";
+"Antigravity port detection failed: %@" = "Antigravity 端口检测失败：%@";
+"Antigravity session expired. Restart Antigravity and retry." = "Antigravity 会话已过期。请重启 Antigravity 后重试。";
+"Antigravity API error: %@" = "Antigravity API 错误：%@";
 "not detected" = "未检测到";
 "Refresh" = "刷新";
 "Drag to reorder" = "拖拽以重排";

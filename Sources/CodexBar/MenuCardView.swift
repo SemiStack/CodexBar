@@ -624,7 +624,7 @@ extension UsageMenuCardView.Model {
             isRefreshing: input.isRefreshing,
             lastError: input.lastError)
         let redacted = Self.redactedText(input: input, subtitle: subtitle)
-        let placeholder = input.snapshot == nil && !input.isRefreshing && input.lastError == nil
+        let placeholder = input.snapshot == nil && !input.isRefreshing
             ? "No usage yet".appLocalized
             : nil
 
@@ -688,7 +688,10 @@ extension UsageMenuCardView.Model {
         lastError: String?) -> (text: String, style: SubtitleStyle)
     {
         if let lastError, !lastError.isEmpty {
-            return (lastError.trimmingCharacters(in: .whitespacesAndNewlines), .error)
+            let localized = lastError
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .appLocalized
+            return (localized, .error)
         }
 
         if isRefreshing, snapshot == nil {
