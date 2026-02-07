@@ -38,14 +38,17 @@ struct ProviderDetailView: View {
 
                 if let errorDisplay {
                     ProviderErrorView(
-                        title: "Last \(self.store.metadata(for: self.provider).displayName) fetch failed:",
+                        title: AppLocalization.format(
+                            "Last %@ fetch failed:",
+                            language: AppLocalization.currentLanguage(),
+                            self.store.metadata(for: self.provider).displayName),
                         display: errorDisplay,
                         isExpanded: self.$isErrorExpanded,
                         onCopy: { self.onCopyError(errorDisplay.full) })
                 }
 
                 if self.hasSettings {
-                    ProviderSettingsSection(title: "Settings") {
+                    ProviderSettingsSection(title: "Settings".appLocalized) {
                         ForEach(self.settingsPickers) { picker in
                             ProviderSettingsPickerRowView(picker: picker)
                         }
@@ -61,7 +64,7 @@ struct ProviderDetailView: View {
                 }
 
                 if !self.settingsToggles.isEmpty {
-                    ProviderSettingsSection(title: "Options") {
+                    ProviderSettingsSection(title: "Options".appLocalized) {
                         ForEach(self.settingsToggles) { toggle in
                             ProviderSettingsToggleRowView(toggle: toggle)
                         }
@@ -82,26 +85,26 @@ struct ProviderDetailView: View {
     }
 
     private var detailLabelWidth: CGFloat {
-        var infoLabels = ["State", "Source", "Version", "Updated"]
+        var infoLabels = ["State".appLocalized, "Source".appLocalized, "Version".appLocalized, "Updated".appLocalized]
         if self.store.status(for: self.provider) != nil {
-            infoLabels.append("Status")
+            infoLabels.append("Status".appLocalized)
         }
         if !self.model.email.isEmpty {
-            infoLabels.append("Account")
+            infoLabels.append("Account".appLocalized)
         }
         if let plan = self.model.planText, !plan.isEmpty {
-            infoLabels.append("Plan")
+            infoLabels.append("Plan".appLocalized)
         }
 
         var metricLabels = self.model.metrics.map(\.title)
         if self.model.creditsText != nil {
-            metricLabels.append("Credits")
+            metricLabels.append("Credits".appLocalized)
         }
         if let providerCost = self.model.providerCost {
             metricLabels.append(providerCost.title)
         }
         if self.model.tokenUsage != nil {
-            metricLabels.append("Cost")
+            metricLabels.append("Cost".appLocalized)
         }
 
         let infoWidth = ProviderSettingsMetrics.labelWidth(
@@ -147,7 +150,7 @@ private struct ProviderDetailHeaderView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("Refresh")
+                .help("Refresh".appLocalized)
 
                 Toggle("", isOn: self.$isEnabled)
                     .labelsHidden()
@@ -207,31 +210,31 @@ private struct ProviderDetailInfoGrid: View {
     var body: some View {
         let status = self.store.status(for: self.provider)
         let source = self.store.sourceLabel(for: self.provider)
-        let version = self.store.version(for: self.provider) ?? "not detected"
+        let version = self.store.version(for: self.provider) ?? "not detected".appLocalized
         let updated = self.updatedText
         let email = self.model.email
         let plan = self.model.planText ?? ""
-        let enabledText = self.isEnabled ? "Enabled" : "Disabled"
+        let enabledText = self.isEnabled ? "Enabled".appLocalized : "Disabled".appLocalized
 
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
-            ProviderDetailInfoRow(label: "State", value: enabledText, labelWidth: self.labelWidth)
-            ProviderDetailInfoRow(label: "Source", value: source, labelWidth: self.labelWidth)
-            ProviderDetailInfoRow(label: "Version", value: version, labelWidth: self.labelWidth)
-            ProviderDetailInfoRow(label: "Updated", value: updated, labelWidth: self.labelWidth)
+            ProviderDetailInfoRow(label: "State".appLocalized, value: enabledText, labelWidth: self.labelWidth)
+            ProviderDetailInfoRow(label: "Source".appLocalized, value: source, labelWidth: self.labelWidth)
+            ProviderDetailInfoRow(label: "Version".appLocalized, value: version, labelWidth: self.labelWidth)
+            ProviderDetailInfoRow(label: "Updated".appLocalized, value: updated, labelWidth: self.labelWidth)
 
             if let status {
                 ProviderDetailInfoRow(
-                    label: "Status",
+                    label: "Status".appLocalized,
                     value: status.description ?? status.indicator.label,
                     labelWidth: self.labelWidth)
             }
 
             if !email.isEmpty {
-                ProviderDetailInfoRow(label: "Account", value: email, labelWidth: self.labelWidth)
+                ProviderDetailInfoRow(label: "Account".appLocalized, value: email, labelWidth: self.labelWidth)
             }
 
             if !plan.isEmpty {
-                ProviderDetailInfoRow(label: "Plan", value: plan, labelWidth: self.labelWidth)
+                ProviderDetailInfoRow(label: "Plan".appLocalized, value: plan, labelWidth: self.labelWidth)
             }
         }
         .font(.footnote)
@@ -243,9 +246,9 @@ private struct ProviderDetailInfoGrid: View {
             return UsageFormatter.updatedString(from: updated)
         }
         if self.store.refreshingProviders.contains(self.provider) {
-            return "Refreshing"
+            return "Refreshing".appLocalized
         }
-        return "Not fetched yet"
+        return "Not fetched yet".appLocalized
     }
 }
 
@@ -273,7 +276,7 @@ struct ProviderMetricsInlineView: View {
 
     var body: some View {
         ProviderSettingsSection(
-            title: "Usage",
+            title: "Usage".appLocalized,
             spacing: 8,
             verticalPadding: 6,
             horizontalPadding: 0)
@@ -294,7 +297,7 @@ struct ProviderMetricsInlineView: View {
 
                 if let credits = self.model.creditsText {
                     ProviderMetricInlineTextRow(
-                        title: "Credits",
+                        title: "Credits".appLocalized,
                         value: credits,
                         labelWidth: self.labelWidth)
                 }
@@ -308,7 +311,7 @@ struct ProviderMetricsInlineView: View {
 
                 if let tokenUsage = self.model.tokenUsage {
                     ProviderMetricInlineTextRow(
-                        title: "Cost",
+                        title: "Cost".appLocalized,
                         value: tokenUsage.sessionLine,
                         labelWidth: self.labelWidth)
                     ProviderMetricInlineTextRow(
@@ -322,9 +325,9 @@ struct ProviderMetricsInlineView: View {
 
     private var placeholderText: String {
         if !self.isEnabled {
-            return "Disabled — no recent data"
+            return "Disabled — no recent data".appLocalized
         }
-        return self.model.placeholder ?? "No usage yet"
+        return self.model.placeholder ?? "No usage yet".appLocalized
     }
 }
 
@@ -433,11 +436,14 @@ private struct ProviderMetricInlineCostRow: View {
                 UsageProgressBar(
                     percent: self.section.percentUsed,
                     tint: self.progressColor,
-                    accessibilityLabel: "Usage used")
+                    accessibilityLabel: "Usage used".appLocalized)
                     .frame(minWidth: ProviderSettingsMetrics.metricBarWidth, maxWidth: .infinity)
 
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(String(format: "%.0f%% used", self.section.percentUsed))
+                    Text(AppLocalization.format(
+                        "%.0f%% used",
+                        language: AppLocalization.currentLanguage(),
+                        self.section.percentUsed))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()

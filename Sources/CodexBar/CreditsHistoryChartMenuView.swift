@@ -98,7 +98,11 @@ struct CreditsHistoryChartMenuView: View {
                 }
 
                 if let total = model.totalCreditsUsed {
-                    Text("Total (30d): \(total.formatted(.number.precision(.fractionLength(0...2)))) credits")
+                    let amount = total.formatted(.number.precision(.fractionLength(0...2)))
+                    Text(AppLocalization.format(
+                        "Total (30d): %@ credits",
+                        language: AppLocalization.selectedLanguage(),
+                        amount))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

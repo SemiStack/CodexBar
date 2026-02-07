@@ -140,7 +140,11 @@ struct CodexProviderImplementation: ProviderImplementation {
                 trailingText: {
                     guard let entry = CookieHeaderCache.load(provider: .codex) else { return nil }
                     let when = entry.storedAt.relativeDescription()
-                    return "Cached: \(entry.sourceLabel) • \(when)"
+                    return AppLocalization.format(
+                        "Cached: %@ • %@",
+                        language: AppLocalization.currentLanguage(),
+                        entry.sourceLabel,
+                        when)
                 }),
         ]
     }
@@ -170,9 +174,15 @@ struct CodexProviderImplementation: ProviderImplementation {
         else { return }
 
         if let credits = context.store.credits {
-            entries.append(.text("Credits: \(UsageFormatter.creditsString(from: credits.remaining))", .primary))
+            entries.append(.text(AppLocalization.format(
+                "Credits: %@",
+                language: AppLocalization.currentLanguage(),
+                UsageFormatter.creditsString(from: credits.remaining)), .primary))
             if let latest = credits.events.first {
-                entries.append(.text("Last spend: \(UsageFormatter.creditEventSummary(latest))", .secondary))
+                entries.append(.text(AppLocalization.format(
+                    "Last spend: %@",
+                    language: AppLocalization.currentLanguage(),
+                    UsageFormatter.creditEventSummary(latest)), .secondary))
             }
         } else {
             let hint = context.store.lastCreditsError ?? context.metadata.creditsHint

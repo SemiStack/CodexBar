@@ -12,9 +12,16 @@ public struct OpenAIDashboardFetcher {
         public var errorDescription: String? {
             switch self {
             case .loginRequired:
-                "OpenAI web access requires login."
+                return Bundle.main.localizedString(
+                    forKey: "OpenAI web access requires login.",
+                    value: "OpenAI web access requires login.",
+                    table: nil)
             case let .noDashboardData(body):
-                "OpenAI dashboard data not found. Body sample: \(body.prefix(200))"
+                let template = Bundle.main.localizedString(
+                    forKey: "OpenAI dashboard data not found. Body sample: %@",
+                    value: "OpenAI dashboard data not found. Body sample: %@",
+                    table: nil)
+                return String(format: template, locale: .current, String(body.prefix(200)))
             }
         }
     }

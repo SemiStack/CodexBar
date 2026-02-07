@@ -107,7 +107,10 @@ struct CostHistoryChartMenuView: View {
             }
 
             if let total = self.totalCostUSD {
-                Text("Total (30d): \(UsageFormatter.usdString(total))")
+                Text(AppLocalization.format(
+                    "Total (30d): %@",
+                    language: AppLocalization.selectedLanguage(),
+                    UsageFormatter.usdString(total)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

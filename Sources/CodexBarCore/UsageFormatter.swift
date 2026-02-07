@@ -6,16 +6,24 @@ public enum ResetTimeDisplayStyle: String, Codable, Sendable {
 }
 
 public enum UsageFormatter {
+    private static func localized(_ key: String) -> String {
+        Bundle.main.localizedString(forKey: key, value: key, table: nil)
+    }
+
+    private static func localizedFormat(_ key: String, _ args: CVarArg...) -> String {
+        String(format: self.localized(key), locale: .current, arguments: args)
+    }
+
     public static func usageLine(remaining: Double, used: Double, showUsed: Bool) -> String {
         let percent = showUsed ? used : remaining
         let clamped = min(100, max(0, percent))
-        let suffix = showUsed ? "used" : "left"
-        return String(format: "%.0f%% %@", clamped, suffix)
+        let suffixKey = showUsed ? "used" : "left"
+        return self.localizedFormat("%.0f%% %@", clamped, self.localized(suffixKey))
     }
 
     public static func resetCountdownDescription(from date: Date, now: Date = .init()) -> String {
         let seconds = max(0, date.timeIntervalSince(now))
-        if seconds < 1 { return "now" }
+        if seconds < 1 { return self.localized("now") }
 
         let totalMinutes = max(1, Int(ceil(seconds / 60.0)))
         let days = totalMinutes / (24 * 60)
@@ -23,14 +31,14 @@ public enum UsageFormatter {
         let minutes = totalMinutes % 60
 
         if days > 0 {
-            if hours > 0 { return "in \(days)d \(hours)h" }
-            return "in \(days)d"
+            if hours > 0 { return self.localizedFormat("in %dd %dh", days, hours) }
+            return self.localizedFormat("in %dd", days)
         }
         if hours > 0 {
-            if minutes > 0 { return "in \(hours)h \(minutes)m" }
-            return "in \(hours)h"
+            if minutes > 0 { return self.localizedFormat("in %dh %dm", hours, minutes) }
+            return self.localizedFormat("in %dh", hours)
         }
-        return "in \(totalMinutes)m"
+        return self.localizedFormat("in %dm", totalMinutes)
     }
 
     public static func resetDescription(from date: Date, now: Date = .init()) -> String {
@@ -42,7 +50,9 @@ public enum UsageFormatter {
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
            calendar.isDate(date, inSameDayAs: tomorrow)
         {
-            return "tomorrow, \(date.formatted(date: .omitted, time: .shortened))"
+            return self.localizedFormat(
+                "tomorrow, %@",
+                date.formatted(date: .omitted, time: .shortened))
         }
         return date.formatted(date: .abbreviated, time: .shortened)
     }
@@ -56,14 +66,14 @@ public enum UsageFormatter {
             let text = style == .countdown
                 ? self.resetCountdownDescription(from: date, now: now)
                 : self.resetDescription(from: date, now: now)
-            return "Resets \(text)"
+            return self.localizedFormat("Resets %@", text)
         }
 
         if let desc = window.resetDescription {
             let trimmed = desc.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
             if trimmed.lowercased().hasPrefix("resets") { return trimmed }
-            return "Resets \(trimmed)"
+            return self.localizedFormat("Resets %@", trimmed)
         }
         return nil
     }
@@ -71,24 +81,24 @@ public enum UsageFormatter {
     public static func updatedString(from date: Date, now: Date = .init()) -> String {
         let delta = now.timeIntervalSince(date)
         if abs(delta) < 60 {
-            return "Updated just now"
+            return self.localized("Updated just now")
         }
         if let hours = Calendar.current.dateComponents([.hour], from: date, to: now).hour, hours < 24 {
             #if os(macOS)
             let rel = RelativeDateTimeFormatter()
             rel.unitsStyle = .abbreviated
-            return "Updated \(rel.localizedString(for: date, relativeTo: now))"
+            return self.localizedFormat("Updated %@", rel.localizedString(for: date, relativeTo: now))
             #else
             let seconds = max(0, Int(now.timeIntervalSince(date)))
             if seconds < 3600 {
                 let minutes = max(1, seconds / 60)
-                return "Updated \(minutes)m ago"
+                return self.localizedFormat("Updated %dm ago", minutes)
             }
             let wholeHours = max(1, seconds / 3600)
-            return "Updated \(wholeHours)h ago"
+            return self.localizedFormat("Updated %dh ago", wholeHours)
             #endif
         } else {
-            return "Updated \(date.formatted(date: .omitted, time: .shortened))"
+            return self.localizedFormat("Updated %@", date.formatted(date: .omitted, time: .shortened))
         }
     }
 
@@ -99,7 +109,7 @@ public enum UsageFormatter {
         // Use explicit locale for consistent formatting on all systems
         number.locale = Locale(identifier: "en_US_POSIX")
         let formatted = number.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-        return "\(formatted) left"
+        return self.localizedFormat("%@ left", formatted)
     }
 
     /// Formats a USD value with proper negative handling and thousand separators.

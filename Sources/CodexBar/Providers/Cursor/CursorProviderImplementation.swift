@@ -94,9 +94,16 @@ struct CursorProviderImplementation: ProviderImplementation {
         let used = UsageFormatter.currencyString(cost.used, currencyCode: cost.currencyCode)
         if cost.limit > 0 {
             let limitStr = UsageFormatter.currencyString(cost.limit, currencyCode: cost.currencyCode)
-            entries.append(.text("On-Demand: \(used) / \(limitStr)", .primary))
+            entries.append(.text(AppLocalization.format(
+                "On-Demand: %@ / %@",
+                language: AppLocalization.currentLanguage(),
+                used,
+                limitStr), .primary))
         } else {
-            entries.append(.text("On-Demand: \(used)", .primary))
+            entries.append(.text(AppLocalization.format(
+                "On-Demand: %@",
+                language: AppLocalization.currentLanguage(),
+                used), .primary))
         }
     }
 }

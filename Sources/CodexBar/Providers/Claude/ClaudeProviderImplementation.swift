@@ -115,7 +115,11 @@ struct ClaudeProviderImplementation: ProviderImplementation {
                 trailingText: {
                     guard let entry = CookieHeaderCache.load(provider: .claude) else { return nil }
                     let when = entry.storedAt.relativeDescription()
-                    return "Cached: \(entry.sourceLabel) • \(when)"
+                    return AppLocalization.format(
+                        "Cached: %@ • %@",
+                        language: AppLocalization.currentLanguage(),
+                        entry.sourceLabel,
+                        when)
                 }),
         ]
     }
@@ -135,7 +139,7 @@ struct ClaudeProviderImplementation: ProviderImplementation {
     @MainActor
     func appendUsageMenuEntries(context: ProviderMenuUsageContext, entries: inout [ProviderMenuEntry]) {
         if context.snapshot?.secondary == nil {
-            entries.append(.text("Weekly usage unavailable for this account.", .secondary))
+            entries.append(.text("Weekly usage unavailable for this account.".appLocalized, .secondary))
         }
 
         if let cost = context.snapshot?.providerCost,
@@ -144,7 +148,11 @@ struct ClaudeProviderImplementation: ProviderImplementation {
         {
             let used = UsageFormatter.currencyString(cost.used, currencyCode: cost.currencyCode)
             let limit = UsageFormatter.currencyString(cost.limit, currencyCode: cost.currencyCode)
-            entries.append(.text("Extra usage: \(used) / \(limit)", .primary))
+            entries.append(.text(AppLocalization.format(
+                "Extra usage: %@ / %@",
+                language: AppLocalization.currentLanguage(),
+                used,
+                limit), .primary))
         }
     }
 
@@ -153,7 +161,7 @@ struct ClaudeProviderImplementation: ProviderImplementation {
         -> (label: String, action: MenuDescriptor.MenuAction)?
     {
         guard self.shouldOpenTerminalForOAuthError(store: context.store) else { return nil }
-        return ("Open Terminal", .openTerminal(command: "claude"))
+        return ("Open Terminal".appLocalized, .openTerminal(command: "claude"))
     }
 
     @MainActor

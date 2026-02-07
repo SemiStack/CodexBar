@@ -11,15 +11,15 @@ struct UsageMenuCardView: View {
 
             var labelSuffix: String {
                 switch self {
-                case .left: "left"
-                case .used: "used"
+                case .left: "left".appLocalized
+                case .used: "used".appLocalized
                 }
             }
 
             var accessibilityLabel: String {
                 switch self {
-                case .left: "Usage remaining"
-                case .used: "Usage used"
+                case .left: "Usage remaining".appLocalized
+                case .used: "Usage used".appLocalized
                 }
             }
         }
@@ -267,7 +267,7 @@ private struct CopyIconButton: View {
                 .frame(width: 18, height: 18)
         }
         .buttonStyle(CopyIconButtonStyle(isHighlighted: self.isHighlighted))
-        .accessibilityLabel(self.didCopy ? "Copied" : "Copy error")
+        .accessibilityLabel((self.didCopy ? "Copied" : "Copy error").appLocalized)
     }
 
     private func copyToPasteboard() {
@@ -290,12 +290,15 @@ private struct ProviderCostContent: View {
             UsageProgressBar(
                 percent: self.section.percentUsed,
                 tint: self.progressColor,
-                accessibilityLabel: "Extra usage spent")
+                accessibilityLabel: "Extra usage spent".appLocalized)
             HStack(alignment: .firstTextBaseline) {
                 Text(self.section.spendLine)
                     .font(.footnote)
                 Spacer()
-                Text(String(format: "%.0f%% used", min(100, max(0, self.section.percentUsed))))
+                Text(AppLocalization.format(
+                    "%.0f%% used",
+                    language: AppLocalization.currentLanguage(),
+                    min(100, max(0, self.section.percentUsed))))
                     .font(.footnote)
                     .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
             }
@@ -460,7 +463,7 @@ private struct CreditsBarContent: View {
 
     private var scaleText: String {
         let scale = UsageFormatter.tokenCountString(Int(Self.fullScaleTokens))
-        return "\(scale) tokens"
+        return AppLocalization.format("%@ tokens", language: AppLocalization.currentLanguage(), scale)
     }
 
     var body: some View {
@@ -472,7 +475,7 @@ private struct CreditsBarContent: View {
                 UsageProgressBar(
                     percent: percentLeft,
                     tint: self.progressColor,
-                    accessibilityLabel: "Credits remaining")
+                    accessibilityLabel: "Credits remaining".appLocalized)
                 HStack(alignment: .firstTextBaseline) {
                     Text(self.creditsText)
                         .font(.caption)
@@ -621,7 +624,9 @@ extension UsageMenuCardView.Model {
             isRefreshing: input.isRefreshing,
             lastError: input.lastError)
         let redacted = Self.redactedText(input: input, subtitle: subtitle)
-        let placeholder = input.snapshot == nil && !input.isRefreshing && input.lastError == nil ? "No usage yet" : nil
+        let placeholder = input.snapshot == nil && !input.isRefreshing && input.lastError == nil
+            ? "No usage yet".appLocalized
+            : nil
 
         return UsageMenuCardView.Model(
             providerName: input.metadata.displayName,
@@ -687,14 +692,14 @@ extension UsageMenuCardView.Model {
         }
 
         if isRefreshing, snapshot == nil {
-            return ("Refreshing...", .loading)
+            return ("Refreshing...".appLocalized, .loading)
         }
 
         if let updated = snapshot?.updatedAt {
             return (UsageFormatter.updatedString(from: updated), .info)
         }
 
-        return ("Not fetched yet", .info)
+        return ("Not fetched yet".appLocalized, .info)
     }
 
     private struct RedactedText {
@@ -792,7 +797,7 @@ extension UsageMenuCardView.Model {
             let percent = input.usageBarsShowUsed ? (100 - remaining) : remaining
             metrics.append(Metric(
                 id: "code-review",
-                title: "Code review",
+                title: "Code review".appLocalized,
                 percent: Self.clamped(percent),
                 percentStyle: percentStyle,
                 resetText: nil,
@@ -810,7 +815,12 @@ extension UsageMenuCardView.Model {
         let currentStr = UsageFormatter.tokenCountString(limit.currentValue)
         let usageStr = UsageFormatter.tokenCountString(limit.usage)
         let remainingStr = UsageFormatter.tokenCountString(limit.remaining)
-        return "\(currentStr) / \(usageStr) (\(remainingStr) remaining)"
+        return AppLocalization.format(
+            "%@ / %@ (%@ remaining)",
+            language: AppLocalization.currentLanguage(),
+            currentStr,
+            usageStr,
+            remainingStr)
     }
 
     private struct PaceDetail {
@@ -876,9 +886,13 @@ extension UsageMenuCardView.Model {
         let sessionTokens = snapshot.sessionTokens.map { UsageFormatter.tokenCountString($0) }
         let sessionLine: String = {
             if let sessionTokens {
-                return "Today: \(sessionCost) · \(sessionTokens) tokens"
+                return AppLocalization.format(
+                    "Today: %@ · %@ tokens",
+                    language: AppLocalization.currentLanguage(),
+                    sessionCost,
+                    sessionTokens)
             }
-            return "Today: \(sessionCost)"
+            return AppLocalization.format("Today: %@", language: AppLocalization.currentLanguage(), sessionCost)
         }()
 
         let monthCost = snapshot.last30DaysCostUSD.map { UsageFormatter.usdString($0) } ?? "—"
@@ -887,9 +901,13 @@ extension UsageMenuCardView.Model {
         let monthTokens = monthTokensValue.map { UsageFormatter.tokenCountString($0) }
         let monthLine: String = {
             if let monthTokens {
-                return "Last 30 days: \(monthCost) · \(monthTokens) tokens"
+                return AppLocalization.format(
+                    "Last 30 days: %@ · %@ tokens",
+                    language: AppLocalization.currentLanguage(),
+                    monthCost,
+                    monthTokens)
             }
-            return "Last 30 days: \(monthCost)"
+            return AppLocalization.format("Last 30 days: %@", language: AppLocalization.currentLanguage(), monthCost)
         }()
         let err = (error?.isEmpty ?? true) ? nil : error
         return TokenUsageSection(
@@ -912,17 +930,17 @@ extension UsageMenuCardView.Model {
         let title: String
 
         if cost.currencyCode == "Quota" {
-            title = "Quota usage"
+            title = "Quota usage".appLocalized
             used = String(format: "%.0f", cost.used)
             limit = String(format: "%.0f", cost.limit)
         } else {
-            title = "Extra usage"
+            title = "Extra usage".appLocalized
             used = UsageFormatter.currencyString(cost.used, currencyCode: cost.currencyCode)
             limit = UsageFormatter.currencyString(cost.limit, currencyCode: cost.currencyCode)
         }
 
         let percentUsed = Self.clamped((cost.used / cost.limit) * 100)
-        let periodLabel = cost.period ?? "This month"
+        let periodLabel = (cost.period ?? "This month").appLocalized
 
         return ProviderCostSection(
             title: title,
