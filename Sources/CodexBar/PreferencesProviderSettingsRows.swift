@@ -280,6 +280,73 @@ struct ProviderSettingsTokenAccountsRowView: View {
     }
 }
 
+@MainActor
+struct ProviderSettingsCodexAccountsRowView: View {
+    let descriptor: ProviderSettingsCodexAccountsDescriptor
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                Text(self.descriptor.title.appLocalized)
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 8)
+                Button(self.descriptor.addAccountTitle.appLocalized) {
+                    self.descriptor.addAccount()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            if !self.descriptor.subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(self.descriptor.subtitle.appLocalized)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            let accounts = self.descriptor.accounts()
+            if accounts.isEmpty {
+                Text("No accounts added yet.".appLocalized)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(accounts) { account in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                let title: String = if account.isActive {
+                                    AppLocalization.format(
+                                        "%@ · Current",
+                                        language: AppLocalization.currentLanguage(),
+                                        account.displayName)
+                                } else {
+                                    account.displayName
+                                }
+                                Text(title)
+                                    .font(.footnote.weight(account.isActive ? .semibold : .regular))
+                                if let detail = account.detailText, !detail.isEmpty {
+                                    Text(detail.appLocalized)
+                                        .font(.footnote)
+                                        .foregroundStyle(account.isUsingCachedData ? .orange : .secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            Spacer(minLength: 6)
+                            if !account.isActive {
+                                Button("Switch".appLocalized) {
+                                    self.descriptor.switchAccount(account.email)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 extension View {
     @ViewBuilder
     fileprivate func applyProviderSettingsButtonStyle(_ style: ProviderSettingsActionDescriptor.Style) -> some View {

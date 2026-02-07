@@ -29,9 +29,15 @@ enum RefreshFrequency: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .manual: AppLocalization.string("RefreshFrequency.Manual", language: AppLocalization.selectedLanguage())
-        case .oneMinute: AppLocalization.string("RefreshFrequency.OneMinute", language: AppLocalization.selectedLanguage())
-        case .twoMinutes: AppLocalization.string("RefreshFrequency.TwoMinutes", language: AppLocalization.selectedLanguage())
-        case .fiveMinutes: AppLocalization.string("RefreshFrequency.FiveMinutes", language: AppLocalization.selectedLanguage())
+        case .oneMinute: AppLocalization.string(
+                "RefreshFrequency.OneMinute",
+                language: AppLocalization.selectedLanguage())
+        case .twoMinutes: AppLocalization.string(
+                "RefreshFrequency.TwoMinutes",
+                language: AppLocalization.selectedLanguage())
+        case .fiveMinutes: AppLocalization.string(
+                "RefreshFrequency.FiveMinutes",
+                language: AppLocalization.selectedLanguage())
         case .fifteenMinutes:
             AppLocalization.string("RefreshFrequency.FifteenMinutes", language: AppLocalization.selectedLanguage())
         case .thirtyMinutes:

@@ -60,6 +60,14 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
         }
     }
 
+    var loginTargetEmail: String? {
+        didSet {
+            if oldValue != self.loginTargetEmail {
+                self.refreshMenusForLoginStateChange()
+            }
+        }
+    }
+
     var blinkStates: [UsageProvider: BlinkState] = [:]
     var blinkAmounts: [UsageProvider: CGFloat] = [:]
     var wiggleAmounts: [UsageProvider: CGFloat] = [:]
@@ -179,6 +187,11 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
             selector: #selector(self.handleProviderConfigDidChange),
             name: .codexbarProviderConfigDidChange,
             object: nil)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.handleProviderLoginRequest(_:)),
+            name: .codexbarRequestProviderLogin,
+            object: nil)
     }
 
     private func wireBindings() {
@@ -243,6 +256,15 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
             }
         }
         self.handleProviderConfigChange(reason: "notification:\(reason)")
+    }
+
+    @objc private func handleProviderLoginRequest(_ notification: Notification) {
+        let providerRaw = notification.userInfo?["provider"] as? String
+        let provider = providerRaw.flatMap(UsageProvider.init(rawValue:)) ?? .codex
+        let targetEmail = (notification.userInfo?["targetEmail"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        self.startSwitchAccount(provider: provider, targetEmail: targetEmail)
     }
 
     private func observeUpdaterChanges() {
@@ -460,6 +482,9 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
         case .waitingBrowser: base = "Waiting in browser…"
         }
         let prefix = ProviderDescriptorRegistry.descriptor(for: provider).metadata.displayName
+        if let email = self.loginTargetEmail, !email.isEmpty {
+            return "\(prefix): \(base) (\(email))"
+        }
         return "\(prefix): \(base)"
     }
 

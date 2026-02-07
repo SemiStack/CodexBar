@@ -24,6 +24,8 @@ extension UsageStore {
         _ = self.openAIDashboardRequiresLogin
         _ = self.openAIDashboardCookieImportStatus
         _ = self.openAIDashboardCookieImportDebugLog
+        _ = self.codexCachedAccounts
+        _ = self.codexActiveAccountEmail
         _ = self.versions
         _ = self.isRefreshing
         _ = self.refreshingProviders
@@ -154,6 +156,8 @@ final class UsageStore {
     var openAIDashboardRequiresLogin: Bool = false
     var openAIDashboardCookieImportStatus: String?
     var openAIDashboardCookieImportDebugLog: String?
+    var codexCachedAccounts: [CodexCachedAccountRecord] = []
+    var codexActiveAccountEmail: String?
     var versions: [UsageProvider: String] = [:]
     var isRefreshing = false
     var refreshingProviders: Set<UsageProvider> = []
@@ -229,6 +233,7 @@ final class UsageStore {
         self.providerRuntimes = Dictionary(uniqueKeysWithValues: ProviderCatalog.all.compactMap { implementation in
             implementation.makeRuntime().map { (implementation.id, $0) }
         })
+        self.loadCodexAccountCache()
         self.logStartupState()
         self.bindSettings()
         self.detectVersions()
@@ -447,6 +452,7 @@ final class UsageStore {
             await self.refreshCreditsIfNeeded()
         }
 
+        self.refreshCodexAccountCacheFromLiveData()
         self.persistWidgetSnapshot(reason: "refresh")
     }
 
@@ -628,6 +634,7 @@ final class UsageStore {
                         self.lastCreditsError = "Codex credits are still loading; will retry shortly."
                     }
                 }
+                self.refreshCodexAccountCacheFromLiveData()
                 return
             }
 
@@ -644,6 +651,7 @@ final class UsageStore {
                 }
             }
         }
+        self.refreshCodexAccountCacheFromLiveData()
     }
 }
 
@@ -692,6 +700,7 @@ extension UsageStore {
         if let email = targetEmail, !email.isEmpty {
             OpenAIDashboardCacheStore.save(OpenAIDashboardCache(accountEmail: email, snapshot: dash))
         }
+        self.refreshCodexAccountCacheFromLiveData()
     }
 
     private func applyOpenAIDashboardFailure(message: String) async {
@@ -706,6 +715,7 @@ extension UsageStore {
                 self.openAIDashboard = nil
             }
         }
+        self.refreshCodexAccountCacheFromLiveData()
     }
 
     private func refreshOpenAIDashboardIfNeeded(force: Bool = false) async {
@@ -1079,6 +1089,8 @@ extension UsageStore {
         if let cached, !cached.isEmpty { return cached }
         let imported = self.lastOpenAIDashboardCookieImportEmail?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let imported, !imported.isEmpty { return imported }
+        let active = self.codexActiveAccountEmail?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let active, !active.isEmpty { return active }
         return nil
     }
 }

@@ -861,3 +861,121 @@ final class TokenAccountSwitcherView: NSView {
         self.onSelect(index)
     }
 }
+
+final class CodexAccountSwitcherView: NSView {
+    struct AccountEntry: Sendable {
+        let email: String
+        let label: String
+        let isActive: Bool
+    }
+
+    private let accounts: [AccountEntry]
+    private let onSelect: (String) -> Void
+    private var buttons: [NSButton] = []
+    private let rowSpacing: CGFloat = 4
+    private let rowHeight: CGFloat = 26
+    private let activeBackground = NSColor.controlAccentColor.cgColor
+    private let inactiveBackground = NSColor.clear.cgColor
+    private let activeTextColor = NSColor.white
+    private let inactiveTextColor = NSColor.secondaryLabelColor
+
+    init(accounts: [AccountEntry], width: CGFloat, onSelect: @escaping (String) -> Void) {
+        self.accounts = accounts
+        self.onSelect = onSelect
+        let useTwoRows = accounts.count > 3
+        let rows = useTwoRows ? 2 : 1
+        let height = self.rowHeight * CGFloat(rows) + (useTwoRows ? self.rowSpacing : 0)
+        super.init(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        self.wantsLayer = true
+        self.buildButtons(useTwoRows: useTwoRows)
+        self.updateButtonStyles()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    private func buildButtons(useTwoRows: Bool) {
+        let perRow = useTwoRows ? Int(ceil(Double(self.accounts.count) / 2.0)) : self.accounts.count
+        let rows: [[AccountEntry]] = {
+            if !useTwoRows { return [self.accounts] }
+            let first = Array(self.accounts.prefix(perRow))
+            let second = Array(self.accounts.dropFirst(perRow))
+            return [first, second]
+        }()
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = self.rowSpacing
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        var globalIndex = 0
+        for rowAccounts in rows {
+            let row = NSStackView()
+            row.orientation = .horizontal
+            row.alignment = .centerY
+            row.distribution = .fillEqually
+            row.spacing = self.rowSpacing
+            row.translatesAutoresizingMaskIntoConstraints = false
+
+            for account in rowAccounts {
+                let label: String = if account.isActive {
+                    AppLocalization.format(
+                        "%@ · Current",
+                        language: AppLocalization.currentLanguage(),
+                        account.label)
+                } else {
+                    account.label
+                }
+                let button = PaddedToggleButton(
+                    title: label,
+                    target: self,
+                    action: #selector(self.handleSelect))
+                button.tag = globalIndex
+                button.toolTip = account.label
+                button.isBordered = false
+                button.setButtonType(.toggle)
+                button.controlSize = .small
+                button.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+                button.wantsLayer = true
+                button.layer?.cornerRadius = 6
+                button.state = account.isActive ? .on : .off
+                row.addArrangedSubview(button)
+                self.buttons.append(button)
+                globalIndex += 1
+            }
+
+            stack.addArrangedSubview(row)
+        }
+
+        self.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 6),
+            stack.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -6),
+            stack.topAnchor.constraint(equalTo: self.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: self.bottomAnchor),
+            stack.heightAnchor.constraint(equalToConstant: self.rowHeight * CGFloat(rows.count) +
+                (useTwoRows ? self.rowSpacing : 0)),
+        ])
+    }
+
+    private func updateButtonStyles() {
+        for (index, button) in self.buttons.enumerated() {
+            guard index < self.accounts.count else { continue }
+            let isActive = self.accounts[index].isActive
+            button.state = isActive ? .on : .off
+            button.layer?.backgroundColor = isActive ? self.activeBackground : self.inactiveBackground
+            button.contentTintColor = isActive ? self.activeTextColor : self.inactiveTextColor
+        }
+    }
+
+    @objc private func handleSelect(_ sender: NSButton) {
+        let index = sender.tag
+        guard index >= 0, index < self.accounts.count else { return }
+        let account = self.accounts[index]
+        guard !account.isActive else { return }
+        self.onSelect(account.email)
+    }
+}

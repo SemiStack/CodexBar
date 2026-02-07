@@ -102,6 +102,31 @@ struct ProviderSettingsTokenAccountsDescriptor: Identifiable {
     let reloadFromDisk: () -> Void
 }
 
+struct ProviderSettingsCodexAccountItem: Identifiable, Sendable {
+    let email: String
+    let displayName: String
+    let detailText: String?
+    let isActive: Bool
+    let isUsingCachedData: Bool
+
+    var id: String {
+        self.email
+    }
+}
+
+/// Shared Codex account descriptor rendered in the Providers settings pane.
+@MainActor
+struct ProviderSettingsCodexAccountsDescriptor: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let addAccountTitle: String
+    let isVisible: (() -> Bool)?
+    let accounts: () -> [ProviderSettingsCodexAccountItem]
+    let addAccount: () -> Void
+    let switchAccount: (_ email: String) -> Void
+}
+
 /// Shared picker descriptor rendered in the Providers settings pane.
 @MainActor
 struct ProviderSettingsPickerDescriptor: Identifiable {

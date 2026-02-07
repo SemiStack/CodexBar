@@ -86,7 +86,7 @@ struct MenuContent: View {
             self.actions.openDashboard()
         case .statusPage:
             self.actions.openStatusPage()
-        case let .switchAccount(provider):
+        case let .switchAccount(provider, _):
             self.actions.switchAccount(provider)
         case let .openTerminal(command):
             self.actions.openTerminal(command)

@@ -1,6 +1,18 @@
 import AppKit
 import CodexBarCore
 
+final class SwitchAccountActionPayload: NSObject {
+    let provider: UsageProvider
+    let targetEmail: String?
+
+    init(provider: UsageProvider, targetEmail: String?) {
+        self.provider = provider
+        self.targetEmail = targetEmail?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+}
+
 extension StatusItemController {
     // MARK: - Actions reachable from menus
 
@@ -93,29 +105,72 @@ extension StatusItemController {
     }
 
     @objc func runSwitchAccount(_ sender: NSMenuItem) {
+        let payload = sender.representedObject as? SwitchAccountActionPayload
+        let provider: UsageProvider
+        let targetEmail: String?
+        if let payload {
+            provider = payload.provider
+            targetEmail = payload.targetEmail
+        } else {
+            let rawProvider = sender.representedObject as? String
+            provider = rawProvider.flatMap(UsageProvider.init(rawValue:)) ?? self.lastMenuProvider ?? .codex
+            targetEmail = nil
+        }
+        self.startSwitchAccount(provider: provider, targetEmail: targetEmail)
+    }
+
+    func startSwitchAccount(provider: UsageProvider, targetEmail: String?) {
         if self.loginTask != nil {
             self.loginLogger.info("Switch Account tap ignored: login already in-flight")
             return
         }
 
-        let rawProvider = sender.representedObject as? String
-        let provider = rawProvider.flatMap(UsageProvider.init(rawValue:)) ?? self.lastMenuProvider ?? .codex
-        self.loginLogger.info("Switch Account tapped", metadata: ["provider": provider.rawValue])
+        let normalizedTarget = targetEmail?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        self.loginLogger.info(
+            "Switch Account tapped",
+            metadata: [
+                "provider": provider.rawValue,
+                "targetEmail": normalizedTarget ?? "",
+            ])
 
         self.loginTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
                 self.activeLoginProvider = nil
+                self.loginTargetEmail = nil
                 self.loginTask = nil
             }
             self.activeLoginProvider = provider
+            self.loginTargetEmail = normalizedTarget
             self.loginPhase = .requesting
-            self.loginLogger.info("Starting login task", metadata: ["provider": provider.rawValue])
+            self.loginLogger.info(
+                "Starting login task",
+                metadata: [
+                    "provider": provider.rawValue,
+                    "targetEmail": normalizedTarget ?? "",
+                ])
 
             let shouldRefresh = await self.runLoginFlow(provider: provider)
             if shouldRefresh {
                 await self.store.refresh()
                 self.loginLogger.info("Triggered refresh after login", metadata: ["provider": provider.rawValue])
+                if provider == .codex, let normalizedTarget {
+                    let activeEmail = self.store.codexAccountEmailForOpenAIDashboard()?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .lowercased()
+                    if activeEmail != normalizedTarget {
+                        self.presentLoginAlert(
+                            title: "Codex account not switched",
+                            message: AppLocalization.format(
+                                "Expected %@, but the active account is %@. " +
+                                    "Please complete login with the target account in the browser.",
+                                language: AppLocalization.currentLanguage(),
+                                normalizedTarget,
+                                activeEmail ?? "unknown"))
+                    }
+                }
             }
         }
     }

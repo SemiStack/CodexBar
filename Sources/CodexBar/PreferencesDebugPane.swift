@@ -205,7 +205,8 @@ struct DebugPane: View {
                             Text(
                                 self.store.openAIDashboardCookieImportDebugLog?.isEmpty == false
                                     ? (self.store.openAIDashboardCookieImportDebugLog ?? "")
-                                    : "No log yet. Update OpenAI cookies in Providers -> Codex to run an import.".appLocalized)
+                                    : "No log yet. Update OpenAI cookies in Providers -> Codex to run an import."
+                                    .appLocalized)
                                 .font(.system(.footnote, design: .monospaced))
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)

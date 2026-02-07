@@ -3,6 +3,11 @@ import Foundation
 
 @MainActor
 struct MenuDescriptor {
+    private struct AccountEntryOptions {
+        let hidePersonalInfo: Bool
+        let language: AppLanguage
+    }
+
     struct Section {
         var entries: [Entry]
     }
@@ -38,7 +43,7 @@ struct MenuDescriptor {
         case refreshAugmentSession
         case dashboard
         case statusPage
-        case switchAccount(UsageProvider)
+        case switchAccount(UsageProvider, targetEmail: String?)
         case openTerminal(command: String)
         case loginToProvider(url: String)
         case settings
@@ -185,8 +190,9 @@ struct MenuDescriptor {
             snapshot: snapshot,
             metadata: metadata,
             fallback: account,
-            hidePersonalInfo: settings.hidePersonalInfo,
-            language: settings.appLanguage)
+            options: .init(
+                hidePersonalInfo: settings.hidePersonalInfo,
+                language: settings.appLanguage))
         guard !entries.isEmpty else { return nil }
         return Section(entries: entries)
     }
@@ -196,44 +202,45 @@ struct MenuDescriptor {
         snapshot: UsageSnapshot?,
         metadata: ProviderMetadata,
         fallback: AccountInfo,
-        hidePersonalInfo: Bool,
-        language: AppLanguage) -> [Entry]
+        options: AccountEntryOptions) -> [Entry]
     {
         var entries: [Entry] = []
         let emailText = snapshot?.accountEmail(for: provider)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let planText = snapshot?.loginMethod(for: provider)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let redactedEmail = PersonalInfoRedactor.redactEmail(emailText, isEnabled: hidePersonalInfo)
+        let redactedEmail = PersonalInfoRedactor.redactEmail(emailText, isEnabled: options.hidePersonalInfo)
 
         if let emailText, !emailText.isEmpty {
             let accountTitle = AppLocalization.format(
                 "Account: %@",
-                language: language,
+                language: options.language,
                 redactedEmail)
             entries.append(.text(accountTitle, .secondary))
         }
         if let planText, !planText.isEmpty {
             let title = AppLocalization.format(
                 "Plan: %@",
-                language: language,
+                language: options.language,
                 AccountFormatter.plan(planText))
             entries.append(.text(title, .secondary))
         }
 
         if metadata.usesAccountFallback {
             if emailText?.isEmpty ?? true, let fallbackEmail = fallback.email, !fallbackEmail.isEmpty {
-                let redacted = PersonalInfoRedactor.redactEmail(fallbackEmail, isEnabled: hidePersonalInfo)
+                let redacted = PersonalInfoRedactor.redactEmail(
+                    fallbackEmail,
+                    isEnabled: options.hidePersonalInfo)
                 let title = AppLocalization.format(
                     "Account: %@",
-                    language: language,
+                    language: options.language,
                     redacted)
                 entries.append(.text(title, .secondary))
             }
             if planText?.isEmpty ?? true, let fallbackPlan = fallback.plan, !fallbackPlan.isEmpty {
                 let title = AppLocalization.format(
                     "Plan: %@",
-                    language: language,
+                    language: options.language,
                     AccountFormatter.plan(fallbackPlan))
                 entries.append(.text(title, .secondary))
             }
@@ -282,10 +289,15 @@ struct MenuDescriptor {
                 entries.append(.action(override.label, override.action))
             } else {
                 let loginAction = self.switchAccountTarget(for: provider, store: store)
-                let hasAccount = self.hasAccount(for: provider, store: store, account: account)
-                let accountLabel = hasAccount
-                    ? AppLocalization.string("Switch Account...", language: store.settings.appLanguage)
-                    : AppLocalization.string("Add Account...", language: store.settings.appLanguage)
+                let accountLabel: String
+                if targetProvider == .codex {
+                    accountLabel = AppLocalization.string("Add Account...", language: store.settings.appLanguage)
+                } else {
+                    let hasAccount = self.hasAccount(for: provider, store: store, account: account)
+                    accountLabel = hasAccount
+                        ? AppLocalization.string("Switch Account...", language: store.settings.appLanguage)
+                        : AppLocalization.string("Add Account...", language: store.settings.appLanguage)
+                }
                 entries.append(.action(accountLabel, loginAction))
             }
         }
@@ -349,9 +361,9 @@ struct MenuDescriptor {
     }
 
     private static func switchAccountTarget(for provider: UsageProvider?, store: UsageStore) -> MenuAction {
-        if let provider { return .switchAccount(provider) }
-        if let enabled = store.enabledProviders().first { return .switchAccount(enabled) }
-        return .switchAccount(.codex)
+        if let provider { return .switchAccount(provider, targetEmail: nil) }
+        if let enabled = store.enabledProviders().first { return .switchAccount(enabled, targetEmail: nil) }
+        return .switchAccount(.codex, targetEmail: nil)
     }
 
     private static func hasAccount(for provider: UsageProvider?, store: UsageStore, account: AccountInfo) -> Bool {

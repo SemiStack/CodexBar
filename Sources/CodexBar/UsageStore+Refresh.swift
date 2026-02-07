@@ -97,5 +97,9 @@ extension UsageStore {
                 runtime.providerDidFail(context: context, provider: provider, error: error)
             }
         }
+
+        if provider == .codex {
+            self.refreshCodexAccountCacheFromLiveData()
+        }
     }
 }

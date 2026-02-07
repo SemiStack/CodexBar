@@ -97,6 +97,7 @@ enum ProvidersPaneTestHarness {
             settingsToggles: [descriptors.toggle],
             settingsFields: [descriptors.fieldPlain, descriptors.fieldSecure],
             settingsTokenAccounts: descriptors.tokenAccountsEmpty,
+            settingsCodexAccounts: descriptors.codexAccounts,
             errorDisplay: ProviderErrorDisplay(preview: "Preview", full: "Full"),
             isErrorExpanded: expandedBinding,
             onCopyError: { _ in },
@@ -175,13 +176,32 @@ enum ProvidersPaneTestHarness {
             removeAccount: { _ in },
             openConfigFile: {},
             reloadFromDisk: {})
+        let codexAccounts = ProviderSettingsCodexAccountsDescriptor(
+            id: "codex-accounts",
+            title: "Codex Accounts",
+            subtitle: "Switch",
+            addAccountTitle: "Add Account...",
+            isVisible: { true },
+            accounts: {
+                [
+                    ProviderSettingsCodexAccountItem(
+                        email: "a@example.com",
+                        displayName: "a@example.com",
+                        detailText: "Cached account",
+                        isActive: true,
+                        isUsingCachedData: false),
+                ]
+            },
+            addAccount: {},
+            switchAccount: { _ in })
 
         return ProviderListTestDescriptors(
             toggle: toggle,
             picker: picker,
             fieldPlain: fieldPlain,
             fieldSecure: fieldSecure,
-            tokenAccountsEmpty: tokenAccountsEmpty)
+            tokenAccountsEmpty: tokenAccountsEmpty,
+            codexAccounts: codexAccounts)
     }
 }
 
@@ -191,5 +211,6 @@ private struct ProviderListTestDescriptors {
     let fieldPlain: ProviderSettingsFieldDescriptor
     let fieldSecure: ProviderSettingsFieldDescriptor
     let tokenAccountsEmpty: ProviderSettingsTokenAccountsDescriptor
+    let codexAccounts: ProviderSettingsCodexAccountsDescriptor
 }
 #endif

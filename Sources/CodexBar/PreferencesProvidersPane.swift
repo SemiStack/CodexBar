@@ -39,6 +39,7 @@ struct ProvidersPane: View {
                     settingsToggles: self.extraSettingsToggles(for: provider),
                     settingsFields: self.extraSettingsFields(for: provider),
                     settingsTokenAccounts: self.tokenAccountDescriptor(for: provider),
+                    settingsCodexAccounts: self.codexAccountsDescriptor(for: provider),
                     errorDisplay: self.providerErrorDisplay(provider),
                     isErrorExpanded: self.expandedBinding(for: provider),
                     onCopyError: { text in self.copyToPasteboard(text) },
@@ -209,6 +210,36 @@ struct ProvidersPane: View {
                 Task { @MainActor in
                     await self.store.refreshProvider(provider, allowDisabled: true)
                 }
+            })
+    }
+
+    func codexAccountsDescriptor(for provider: UsageProvider) -> ProviderSettingsCodexAccountsDescriptor? {
+        guard provider == .codex else { return nil }
+        return ProviderSettingsCodexAccountsDescriptor(
+            id: "codex-cached-accounts",
+            title: "Accounts".appLocalized,
+            subtitle: "Add another account, then click any non-current account to switch login.",
+            addAccountTitle: "Add Account...",
+            isVisible: { true },
+            accounts: {
+                self.store.codexAccountDisplays().map { account in
+                    let redacted = PersonalInfoRedactor.redactEmail(
+                        account.email,
+                        isEnabled: self.settings.hidePersonalInfo)
+                    let detail = account.cacheNotice ?? account.updatedAt.map { UsageFormatter.updatedString(from: $0) }
+                    return ProviderSettingsCodexAccountItem(
+                        email: account.email,
+                        displayName: redacted,
+                        detailText: detail,
+                        isActive: account.isActive,
+                        isUsingCachedData: account.isUsingCachedData)
+                }
+            },
+            addAccount: {
+                self.requestProviderLogin(provider: .codex, targetEmail: nil)
+            },
+            switchAccount: { email in
+                self.requestProviderLogin(provider: .codex, targetEmail: email)
             })
     }
 
@@ -387,6 +418,21 @@ struct ProvidersPane: View {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(text, forType: .string)
+    }
+
+    private func requestProviderLogin(provider: UsageProvider, targetEmail: String?) {
+        var userInfo: [String: Any] = ["provider": provider.rawValue]
+        if let targetEmail = targetEmail?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+            !targetEmail.isEmpty
+        {
+            userInfo["targetEmail"] = targetEmail
+        }
+        NotificationCenter.default.post(
+            name: .codexbarRequestProviderLogin,
+            object: nil,
+            userInfo: userInfo)
     }
 }
 

@@ -24,6 +24,13 @@ extension StatusItemController {
         let showSwitcher: Bool
     }
 
+    private struct CodexAccountMenuDisplay {
+        let accounts: [CodexAccountDisplay]
+        let activeEmail: String?
+        let showAllCards: Bool
+        let showSwitcher: Bool
+    }
+
     private func menuCardWidth(for providers: [UsageProvider], menu: NSMenu? = nil) -> CGFloat {
         _ = menu
         return Self.menuCardBaseWidth
@@ -113,18 +120,25 @@ extension StatusItemController {
         let menuWidth = self.menuCardWidth(for: enabledProviders, menu: menu)
         let currentProvider = selectedProvider ?? enabledProviders.first ?? .codex
         let tokenAccountDisplay = self.tokenAccountMenuDisplay(for: currentProvider)
+        let codexAccountDisplay = tokenAccountDisplay == nil
+            ? self.codexAccountMenuDisplay(for: currentProvider)
+            : nil
         let showAllTokenAccounts = tokenAccountDisplay?.showAll ?? false
+        let showAllCodexAccounts = codexAccountDisplay?.showAllCards ?? false
         let openAIContext = self.openAIWebContext(
             currentProvider: currentProvider,
-            showAllTokenAccounts: showAllTokenAccounts)
+            showAllTokenAccounts: showAllTokenAccounts || showAllCodexAccounts)
 
         let hasTokenAccountSwitcher = menu.items.contains { $0.view is TokenAccountSwitcherView }
+        let hasCodexAccountSwitcher = menu.items.contains { $0.view is CodexAccountSwitcherView }
         let switcherProvidersMatch = enabledProviders == self.lastSwitcherProviders
         let canSmartUpdate = self.shouldMergeIcons &&
             enabledProviders.count > 1 &&
             switcherProvidersMatch &&
             tokenAccountDisplay == nil &&
+            codexAccountDisplay == nil &&
             !hasTokenAccountSwitcher &&
+            !hasCodexAccountSwitcher &&
             !menu.items.isEmpty &&
             menu.items.first?.view is ProviderSwitcherView
 
@@ -156,11 +170,13 @@ extension StatusItemController {
             self.lastSwitcherProviders = enabledProviders
         }
         self.addTokenAccountSwitcherIfNeeded(to: menu, display: tokenAccountDisplay)
+        self.addCodexAccountSwitcherIfNeeded(to: menu, display: codexAccountDisplay)
         let menuContext = MenuCardContext(
             currentProvider: currentProvider,
             selectedProvider: selectedProvider,
             menuWidth: menuWidth,
             tokenAccountDisplay: tokenAccountDisplay,
+            codexAccountDisplay: codexAccountDisplay,
             openAIContext: openAIContext)
         let addedOpenAIWebItems = self.addMenuCards(to: menu, context: menuContext)
         self.addOpenAIWebItemsIfNeeded(
@@ -193,6 +209,11 @@ extension StatusItemController {
         {
             contentStartIndex += 2
         }
+        if menu.items.count > contentStartIndex,
+           menu.items[contentStartIndex].view is CodexAccountSwitcherView
+        {
+            contentStartIndex += 2
+        }
         while menu.items.count > contentStartIndex {
             menu.removeItem(at: contentStartIndex)
         }
@@ -209,6 +230,7 @@ extension StatusItemController {
             selectedProvider: provider,
             menuWidth: menuWidth,
             tokenAccountDisplay: nil,
+            codexAccountDisplay: nil,
             openAIContext: openAIContext)
         let addedOpenAIWebItems = self.addMenuCards(to: menu, context: menuContext)
         self.addOpenAIWebItemsIfNeeded(
@@ -231,6 +253,7 @@ extension StatusItemController {
         let selectedProvider: UsageProvider?
         let menuWidth: CGFloat
         let tokenAccountDisplay: TokenAccountMenuDisplay?
+        let codexAccountDisplay: CodexAccountMenuDisplay?
         let openAIContext: OpenAIWebContext
     }
 
@@ -276,7 +299,50 @@ extension StatusItemController {
         menu.addItem(.separator())
     }
 
+    private func addCodexAccountSwitcherIfNeeded(to menu: NSMenu, display: CodexAccountMenuDisplay?) {
+        guard let display, display.showSwitcher else { return }
+        let switcherItem = self.makeCodexAccountSwitcherItem(display: display, menu: menu)
+        menu.addItem(switcherItem)
+        menu.addItem(.separator())
+    }
+
     private func addMenuCards(to menu: NSMenu, context: MenuCardContext) -> Bool {
+        if let codexAccountDisplay = context.codexAccountDisplay, codexAccountDisplay.showAllCards {
+            let cards = codexAccountDisplay.accounts.compactMap { account in
+                let subtitleOverride = account.cacheNotice.map {
+                    UsageMenuCardView.Model.SubtitleOverride(text: $0, style: account.isActive ? .error : .info)
+                }
+                return self.menuCardModel(
+                    for: .codex,
+                    snapshotOverride: account.snapshot,
+                    errorOverride: nil,
+                    subtitleOverride: subtitleOverride,
+                    accountOverride: AccountInfo(email: nil, plan: nil))
+            }
+
+            if cards.isEmpty, let model = self.menuCardModel(for: context.selectedProvider) {
+                menu.addItem(self.makeMenuCardItem(
+                    UsageMenuCardView(model: model, width: context.menuWidth),
+                    id: "menuCard",
+                    width: context.menuWidth))
+                menu.addItem(.separator())
+            } else {
+                for (index, model) in cards.enumerated() {
+                    menu.addItem(self.makeMenuCardItem(
+                        UsageMenuCardView(model: model, width: context.menuWidth),
+                        id: "menuCard-codex-\(index)",
+                        width: context.menuWidth))
+                    if index < cards.count - 1 {
+                        menu.addItem(.separator())
+                    }
+                }
+                if !cards.isEmpty {
+                    menu.addItem(.separator())
+                }
+            }
+            return false
+        }
+
         if let tokenAccountDisplay = context.tokenAccountDisplay, tokenAccountDisplay.showAll {
             let accountSnapshots = tokenAccountDisplay.snapshots
             let cards = accountSnapshots.isEmpty
@@ -393,7 +459,7 @@ extension StatusItemController {
                         image.size = NSSize(width: 16, height: 16)
                         item.image = image
                     }
-                    if case let .switchAccount(targetProvider) = action,
+                    if case let .switchAccount(targetProvider, _) = action,
                        let subtitle = self.switchAccountSubtitle(for: targetProvider)
                     {
                         item.isEnabled = false
@@ -474,6 +540,31 @@ extension StatusItemController {
         return item
     }
 
+    private func makeCodexAccountSwitcherItem(
+        display: CodexAccountMenuDisplay,
+        menu: NSMenu) -> NSMenuItem
+    {
+        let view = CodexAccountSwitcherView(
+            accounts: display.accounts.map { account in
+                let rendered = PersonalInfoRedactor.redactEmail(
+                    account.email,
+                    isEnabled: self.settings.hidePersonalInfo)
+                return CodexAccountSwitcherView.AccountEntry(
+                    email: account.email,
+                    label: rendered,
+                    isActive: account.isActive)
+            },
+            width: self.menuCardWidth(for: self.store.enabledProviders(), menu: menu),
+            onSelect: { [weak self] targetEmail in
+                guard let self else { return }
+                self.startSwitchAccount(provider: .codex, targetEmail: targetEmail)
+            })
+        let item = NSMenuItem()
+        item.view = view
+        item.isEnabled = false
+        return item
+    }
+
     private func resolvedMenuProvider() -> UsageProvider? {
         let enabled = self.store.enabledProviders()
         if enabled.isEmpty { return .codex }
@@ -497,6 +588,18 @@ extension StatusItemController {
             activeIndex: activeIndex,
             showAll: showAll,
             showSwitcher: !showAll)
+    }
+
+    private func codexAccountMenuDisplay(for provider: UsageProvider) -> CodexAccountMenuDisplay? {
+        guard provider == .codex else { return nil }
+        let accounts = self.store.codexAccountDisplays()
+        guard accounts.count > 1 else { return nil }
+        let activeEmail = accounts.first(where: { $0.isActive })?.email
+        return CodexAccountMenuDisplay(
+            accounts: accounts,
+            activeEmail: activeEmail,
+            showAllCards: true,
+            showSwitcher: true)
     }
 
     private func menuNeedsRefresh(_ menu: NSMenu) -> Bool {
@@ -653,7 +756,7 @@ extension StatusItemController {
         webItems: OpenAIWebMenuItems)
     {
         let hasUsageBlock = !model.metrics.isEmpty || model.placeholder != nil
-        let hasCredits = model.creditsText != nil
+        let hasCredits = model.creditsText != nil || webItems.hasCreditsHistory
         let hasExtraUsage = model.providerCost != nil
         let hasCost = model.tokenUsage != nil
         let bottomPadding = CGFloat(hasCredits ? 4 : 6)
@@ -792,7 +895,10 @@ extension StatusItemController {
         case .refreshAugmentSession: (#selector(self.refreshAugmentSession), nil)
         case .dashboard: (#selector(self.openDashboard), nil)
         case .statusPage: (#selector(self.openStatusPage), nil)
-        case let .switchAccount(provider): (#selector(self.runSwitchAccount(_:)), provider.rawValue)
+        case let .switchAccount(provider, targetEmail):
+            (
+                #selector(self.runSwitchAccount(_:)),
+                SwitchAccountActionPayload(provider: provider, targetEmail: targetEmail))
         case let .openTerminal(command): (#selector(self.openTerminalCommand(_:)), command)
         case let .loginToProvider(url): (#selector(self.openLoginToProvider(_:)), url)
         case .settings: (#selector(self.showSettingsGeneral), nil)
@@ -1153,7 +1259,9 @@ extension StatusItemController {
     private func menuCardModel(
         for provider: UsageProvider?,
         snapshotOverride: UsageSnapshot? = nil,
-        errorOverride: String? = nil) -> UsageMenuCardView.Model?
+        errorOverride: String? = nil,
+        subtitleOverride: UsageMenuCardView.Model.SubtitleOverride? = nil,
+        accountOverride: AccountInfo? = nil) -> UsageMenuCardView.Model?
     {
         let target = provider ?? self.store.enabledProviders().first ?? .codex
         let metadata = self.store.metadata(for: target)
@@ -1198,7 +1306,7 @@ extension StatusItemController {
             dashboardError: dashboardError,
             tokenSnapshot: tokenSnapshot,
             tokenError: tokenError,
-            account: self.account,
+            account: accountOverride ?? self.account,
             isRefreshing: self.store.isRefreshing,
             lastError: errorOverride ?? self.store.error(for: target),
             usageBarsShowUsed: self.settings.usageBarsShowUsed,
@@ -1206,7 +1314,8 @@ extension StatusItemController {
             tokenCostUsageEnabled: self.settings.isCostUsageEffectivelyEnabled(for: target),
             showOptionalCreditsAndExtraUsage: self.settings.showOptionalCreditsAndExtraUsage,
             hidePersonalInfo: self.settings.hidePersonalInfo,
-            now: Date())
+            now: Date(),
+            subtitleOverride: subtitleOverride)
         return UsageMenuCardView.Model.make(input)
     }
 

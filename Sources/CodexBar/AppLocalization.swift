@@ -7,7 +7,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     static let defaultsKey = "appLanguage"
 
-    var id: String { self.rawValue }
+    var id: String {
+        self.rawValue
+    }
 
     var localeIdentifier: String? {
         switch self {

@@ -41,10 +41,15 @@ struct UsageMenuCardView: View {
             }
         }
 
-        enum SubtitleStyle {
+        enum SubtitleStyle: Sendable {
             case info
             case loading
             case error
+        }
+
+        struct SubtitleOverride: Sendable {
+            let text: String
+            let style: SubtitleStyle
         }
 
         struct TokenUsageSection: Sendable {
@@ -595,6 +600,49 @@ extension UsageMenuCardView.Model {
         let showOptionalCreditsAndExtraUsage: Bool
         let hidePersonalInfo: Bool
         let now: Date
+        let subtitleOverride: SubtitleOverride?
+
+        init(
+            provider: UsageProvider,
+            metadata: ProviderMetadata,
+            snapshot: UsageSnapshot?,
+            credits: CreditsSnapshot?,
+            creditsError: String?,
+            dashboard: OpenAIDashboardSnapshot?,
+            dashboardError: String?,
+            tokenSnapshot: CostUsageTokenSnapshot?,
+            tokenError: String?,
+            account: AccountInfo,
+            isRefreshing: Bool,
+            lastError: String?,
+            usageBarsShowUsed: Bool,
+            resetTimeDisplayStyle: ResetTimeDisplayStyle,
+            tokenCostUsageEnabled: Bool,
+            showOptionalCreditsAndExtraUsage: Bool,
+            hidePersonalInfo: Bool,
+            now: Date,
+            subtitleOverride: SubtitleOverride? = nil)
+        {
+            self.provider = provider
+            self.metadata = metadata
+            self.snapshot = snapshot
+            self.credits = credits
+            self.creditsError = creditsError
+            self.dashboard = dashboard
+            self.dashboardError = dashboardError
+            self.tokenSnapshot = tokenSnapshot
+            self.tokenError = tokenError
+            self.account = account
+            self.isRefreshing = isRefreshing
+            self.lastError = lastError
+            self.usageBarsShowUsed = usageBarsShowUsed
+            self.resetTimeDisplayStyle = resetTimeDisplayStyle
+            self.tokenCostUsageEnabled = tokenCostUsageEnabled
+            self.showOptionalCreditsAndExtraUsage = showOptionalCreditsAndExtraUsage
+            self.hidePersonalInfo = hidePersonalInfo
+            self.now = now
+            self.subtitleOverride = subtitleOverride
+        }
     }
 
     static func make(_ input: Input) -> UsageMenuCardView.Model {
@@ -604,9 +652,10 @@ extension UsageMenuCardView.Model {
             account: input.account,
             metadata: input.metadata)
         let metrics = Self.metrics(input: input)
-        // Hide Codex credits block in the menu card; manual refresh remains available from header row.
         let creditsText: String? = if input.provider == .codex {
-            nil
+            input.showOptionalCreditsAndExtraUsage
+                ? Self.creditsLine(metadata: input.metadata, credits: input.credits, error: input.creditsError)
+                : nil
         } else {
             Self.creditsLine(metadata: input.metadata, credits: input.credits, error: input.creditsError)
         }
@@ -620,12 +669,12 @@ extension UsageMenuCardView.Model {
             enabled: input.tokenCostUsageEnabled,
             snapshot: input.tokenSnapshot,
             error: input.tokenError)
-        let subtitle = Self.subtitle(
+        let subtitle = input.subtitleOverride ?? Self.subtitle(
             snapshot: input.snapshot,
             isRefreshing: input.isRefreshing,
             lastError: input.lastError)
         let redacted = Self.redactedText(input: input, subtitle: subtitle)
-        let placeholder = input.snapshot == nil && !input.isRefreshing
+        let placeholder = input.snapshot == nil && !input.isRefreshing && subtitle.style != .error
             ? "No usage yet".appLocalized
             : nil
 
@@ -686,24 +735,24 @@ extension UsageMenuCardView.Model {
     private static func subtitle(
         snapshot: UsageSnapshot?,
         isRefreshing: Bool,
-        lastError: String?) -> (text: String, style: SubtitleStyle)
+        lastError: String?) -> SubtitleOverride
     {
         if let lastError, !lastError.isEmpty {
             let localized = lastError
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .appLocalized
-            return (localized, .error)
+            return SubtitleOverride(text: localized, style: .error)
         }
 
         if isRefreshing, snapshot == nil {
-            return ("Refreshing...".appLocalized, .loading)
+            return SubtitleOverride(text: "Refreshing...".appLocalized, style: .loading)
         }
 
         if let updated = snapshot?.updatedAt {
-            return (UsageFormatter.updatedString(from: updated), .info)
+            return SubtitleOverride(text: UsageFormatter.updatedString(from: updated), style: .info)
         }
 
-        return ("Not fetched yet".appLocalized, .info)
+        return SubtitleOverride(text: "Not fetched yet".appLocalized, style: .info)
     }
 
     private struct RedactedText {
@@ -715,7 +764,7 @@ extension UsageMenuCardView.Model {
 
     private static func redactedText(
         input: Input,
-        subtitle: (text: String, style: SubtitleStyle)) -> RedactedText
+        subtitle: SubtitleOverride) -> RedactedText
     {
         let email = PersonalInfoRedactor.redactEmail(
             Self.email(

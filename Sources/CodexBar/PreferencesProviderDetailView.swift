@@ -12,6 +12,7 @@ struct ProviderDetailView: View {
     let settingsToggles: [ProviderSettingsToggleDescriptor]
     let settingsFields: [ProviderSettingsFieldDescriptor]
     let settingsTokenAccounts: ProviderSettingsTokenAccountsDescriptor?
+    let settingsCodexAccounts: ProviderSettingsCodexAccountsDescriptor?
     let errorDisplay: ProviderErrorDisplay?
     @Binding var isErrorExpanded: Bool
     let onCopyError: (String) -> Void
@@ -57,6 +58,11 @@ struct ProviderDetailView: View {
                         {
                             ProviderSettingsTokenAccountsRowView(descriptor: tokenAccounts)
                         }
+                        if let codexAccounts = self.settingsCodexAccounts,
+                           codexAccounts.isVisible?() ?? true
+                        {
+                            ProviderSettingsCodexAccountsRowView(descriptor: codexAccounts)
+                        }
                         ForEach(self.settingsFields) { field in
                             ProviderSettingsFieldRowView(field: field)
                         }
@@ -81,7 +87,8 @@ struct ProviderDetailView: View {
     private var hasSettings: Bool {
         !self.settingsPickers.isEmpty ||
             !self.settingsFields.isEmpty ||
-            self.settingsTokenAccounts != nil
+            self.settingsTokenAccounts != nil ||
+            self.settingsCodexAccounts != nil
     }
 
     private var detailLabelWidth: CGFloat {

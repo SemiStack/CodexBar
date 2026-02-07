@@ -39,8 +39,8 @@ struct ProviderErrorView: View {
                 Button(self.isExpanded ? "Hide details".appLocalized : "Show details".appLocalized) {
                     self.isExpanded.toggle()
                 }
-                    .buttonStyle(.link)
-                    .font(.footnote)
+                .buttonStyle(.link)
+                .font(.footnote)
             }
 
             if self.isExpanded {
