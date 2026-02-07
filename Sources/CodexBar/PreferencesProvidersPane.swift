@@ -76,7 +76,7 @@ struct ProvidersPane: View {
                         active.onConfirm()
                         self.activeConfirmation = nil
                     }
-                    Button("Cancel", role: .cancel) { self.activeConfirmation = nil }
+                    Button("Cancel".appLocalized, role: .cancel) { self.activeConfirmation = nil }
                 }
             },
             message: {
@@ -113,9 +113,9 @@ struct ProvidersPane: View {
             let relative = snapshot.updatedAt.relativeDescription()
             usageText = relative
         } else if self.store.isStale(provider: provider) {
-            usageText = "last fetch failed"
+            usageText = "last fetch failed".appLocalized
         } else {
-            usageText = "usage not fetched yet"
+            usageText = "usage not fetched yet".appLocalized
         }
 
         let presentationContext = ProviderPresentationContext(
@@ -257,23 +257,35 @@ struct ProvidersPane: View {
         let metadata = self.store.metadata(for: provider)
         let supportsAverage = self.settings.menuBarMetricSupportsAverage(for: provider)
         var options: [ProviderSettingsPickerOption] = [
-            ProviderSettingsPickerOption(id: MenuBarMetricPreference.automatic.rawValue, title: "Automatic"),
+            ProviderSettingsPickerOption(
+                id: MenuBarMetricPreference.automatic.rawValue,
+                title: "Automatic".appLocalized),
             ProviderSettingsPickerOption(
                 id: MenuBarMetricPreference.primary.rawValue,
-                title: "Primary (\(metadata.sessionLabel))"),
+                title: AppLocalization.format(
+                    "Primary (%@)",
+                    language: AppLocalization.currentLanguage(),
+                    metadata.sessionLabel)),
             ProviderSettingsPickerOption(
                 id: MenuBarMetricPreference.secondary.rawValue,
-                title: "Secondary (\(metadata.weeklyLabel))"),
+                title: AppLocalization.format(
+                    "Secondary (%@)",
+                    language: AppLocalization.currentLanguage(),
+                    metadata.weeklyLabel)),
         ]
         if supportsAverage {
             options.append(ProviderSettingsPickerOption(
                 id: MenuBarMetricPreference.average.rawValue,
-                title: "Average (\(metadata.sessionLabel) + \(metadata.weeklyLabel))"))
+                title: AppLocalization.format(
+                    "Average (%@ + %@)",
+                    language: AppLocalization.currentLanguage(),
+                    metadata.sessionLabel,
+                    metadata.weeklyLabel)))
         }
         return ProviderSettingsPickerDescriptor(
             id: "menuBarMetric",
-            title: "Menu bar metric",
-            subtitle: "Choose which window drives the menu bar percent.",
+            title: "Menu bar metric".appLocalized,
+            subtitle: "Choose which window drives the menu bar percent.".appLocalized,
             binding: Binding(
                 get: { self.settings.menuBarMetricPreference(for: provider).rawValue },
                 set: { rawValue in
@@ -387,9 +399,9 @@ struct ProviderSettingsConfirmationState: Identifiable {
     let onConfirm: () -> Void
 
     init(confirmation: ProviderSettingsConfirmation) {
-        self.title = confirmation.title
-        self.message = confirmation.message
-        self.confirmTitle = confirmation.confirmTitle
+        self.title = confirmation.title.appLocalized
+        self.message = confirmation.message.appLocalized
+        self.confirmTitle = confirmation.confirmTitle.appLocalized
         self.onConfirm = confirmation.onConfirm
     }
 }

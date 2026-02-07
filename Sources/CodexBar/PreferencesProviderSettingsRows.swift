@@ -23,7 +23,7 @@ struct ProviderSettingsSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: self.spacing) {
-            Text(self.title)
+            Text(self.title.appLocalized)
                 .font(.headline)
             self.content()
         }
@@ -41,9 +41,9 @@ struct ProviderSettingsToggleRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(self.toggle.title)
+                    Text(self.toggle.title.appLocalized)
                         .font(.subheadline.weight(.semibold))
-                    Text(self.toggle.subtitle)
+                    Text(self.toggle.subtitle.appLocalized)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -56,7 +56,7 @@ struct ProviderSettingsToggleRowView: View {
 
             if self.toggle.binding.wrappedValue {
                 if let status = self.toggle.statusText?(), !status.isEmpty {
-                    Text(status)
+                    Text(status.appLocalized)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(4)
@@ -67,7 +67,7 @@ struct ProviderSettingsToggleRowView: View {
                 if !actions.isEmpty {
                     HStack(spacing: 10) {
                         ForEach(actions) { action in
-                            Button(action.title) {
+                            Button(action.title.appLocalized) {
                                 Task { @MainActor in
                                     await action.perform()
                                 }
@@ -100,13 +100,13 @@ struct ProviderSettingsPickerRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(self.picker.title)
+                Text(self.picker.title.appLocalized)
                     .font(.subheadline.weight(.semibold))
                     .frame(width: ProviderSettingsMetrics.pickerLabelWidth, alignment: .leading)
 
                 Picker("", selection: self.picker.binding) {
                     ForEach(self.picker.options) { option in
-                        Text(option.title).tag(option.id)
+                        Text(option.title.appLocalized).tag(option.id)
                     }
                 }
                 .labelsHidden()
@@ -114,7 +114,7 @@ struct ProviderSettingsPickerRowView: View {
                 .controlSize(.small)
 
                 if let trailingText = self.picker.trailingText?(), !trailingText.isEmpty {
-                    Text(trailingText)
+                    Text(trailingText.appLocalized)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -127,7 +127,7 @@ struct ProviderSettingsPickerRowView: View {
 
             let subtitle = self.picker.dynamicSubtitle?() ?? self.picker.subtitle
             if !subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(subtitle)
+                Text(subtitle.appLocalized)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -148,8 +148,8 @@ struct ProviderSettingsFieldRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            let trimmedTitle = self.field.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedSubtitle = self.field.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedTitle = self.field.title.appLocalized.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedSubtitle = self.field.subtitle.appLocalized.trimmingCharacters(in: .whitespacesAndNewlines)
             let hasHeader = !trimmedTitle.isEmpty || !trimmedSubtitle.isEmpty
 
             if hasHeader {
@@ -169,12 +169,12 @@ struct ProviderSettingsFieldRowView: View {
 
             switch self.field.kind {
             case .plain:
-                TextField(self.field.placeholder ?? "", text: self.field.binding)
+                TextField((self.field.placeholder ?? "").appLocalized, text: self.field.binding)
                     .textFieldStyle(.roundedBorder)
                     .font(.footnote)
                     .onTapGesture { self.field.onActivate?() }
             case .secure:
-                SecureField(self.field.placeholder ?? "", text: self.field.binding)
+                SecureField((self.field.placeholder ?? "").appLocalized, text: self.field.binding)
                     .textFieldStyle(.roundedBorder)
                     .font(.footnote)
                     .onTapGesture { self.field.onActivate?() }
@@ -184,7 +184,7 @@ struct ProviderSettingsFieldRowView: View {
             if !actions.isEmpty {
                 HStack(spacing: 10) {
                     ForEach(actions) { action in
-                        Button(action.title) {
+                        Button(action.title.appLocalized) {
                             Task { @MainActor in
                                 await action.perform()
                             }
@@ -206,11 +206,11 @@ struct ProviderSettingsTokenAccountsRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(self.descriptor.title)
+            Text(self.descriptor.title.appLocalized)
                 .font(.subheadline.weight(.semibold))
 
             if !self.descriptor.subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(self.descriptor.subtitle)
+                Text(self.descriptor.subtitle.appLocalized)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -218,7 +218,7 @@ struct ProviderSettingsTokenAccountsRowView: View {
 
             let accounts = self.descriptor.accounts()
             if accounts.isEmpty {
-                Text("No token accounts yet.")
+                Text("No token accounts yet.".appLocalized)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
@@ -235,7 +235,7 @@ struct ProviderSettingsTokenAccountsRowView: View {
                 .pickerStyle(.menu)
                 .controlSize(.small)
 
-                Button("Remove selected account") {
+                Button("Remove selected account".appLocalized) {
                     let account = accounts[selectedIndex]
                     self.descriptor.removeAccount(account.id)
                 }
@@ -244,13 +244,13 @@ struct ProviderSettingsTokenAccountsRowView: View {
             }
 
             HStack(spacing: 8) {
-                TextField("Label", text: self.$newLabel)
+                TextField("Label".appLocalized, text: self.$newLabel)
                     .textFieldStyle(.roundedBorder)
                     .font(.footnote)
-                SecureField(self.descriptor.placeholder, text: self.$newToken)
+                SecureField(self.descriptor.placeholder.appLocalized, text: self.$newToken)
                     .textFieldStyle(.roundedBorder)
                     .font(.footnote)
-                Button("Add") {
+                Button("Add".appLocalized) {
                     let label = self.newLabel.trimmingCharacters(in: .whitespacesAndNewlines)
                     let token = self.newToken.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !label.isEmpty, !token.isEmpty else { return }
@@ -265,12 +265,12 @@ struct ProviderSettingsTokenAccountsRowView: View {
             }
 
             HStack(spacing: 10) {
-                Button("Open token file") {
+                Button("Open token file".appLocalized) {
                     self.descriptor.openConfigFile()
                 }
                 .buttonStyle(.link)
                 .controlSize(.small)
-                Button("Reload") {
+                Button("Reload".appLocalized) {
                     self.descriptor.reloadFromDisk()
                 }
                 .buttonStyle(.link)

@@ -105,7 +105,7 @@ extension AdvancedPane {
         let helperURL = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/CodexBarCLI")
         let fm = FileManager.default
         guard fm.fileExists(atPath: helperURL.path) else {
-            self.cliStatus = "CodexBarCLI not found in app bundle."
+            self.cliStatus = "CodexBarCLI not found in app bundle.".appLocalized
             return
         }
 
@@ -119,29 +119,44 @@ extension AdvancedPane {
             let dir = (dest as NSString).deletingLastPathComponent
             guard fm.fileExists(atPath: dir) else { continue }
             guard fm.isWritableFile(atPath: dir) else {
-                results.append("No write access: \(dir)")
+                results.append(AppLocalization.format(
+                    "No write access: %@",
+                    language: AppLocalization.currentLanguage(),
+                    dir))
                 continue
             }
 
             if fm.fileExists(atPath: dest) {
                 if Self.isLink(atPath: dest, pointingTo: helperURL.path) {
-                    results.append("Installed: \(dir)")
+                    results.append(AppLocalization.format(
+                        "Installed: %@",
+                        language: AppLocalization.currentLanguage(),
+                        dir))
                 } else {
-                    results.append("Exists: \(dir)")
+                    results.append(AppLocalization.format(
+                        "Exists: %@",
+                        language: AppLocalization.currentLanguage(),
+                        dir))
                 }
                 continue
             }
 
             do {
                 try fm.createSymbolicLink(atPath: dest, withDestinationPath: helperURL.path)
-                results.append("Installed: \(dir)")
+                results.append(AppLocalization.format(
+                    "Installed: %@",
+                    language: AppLocalization.currentLanguage(),
+                    dir))
             } catch {
-                results.append("Failed: \(dir)")
+                results.append(AppLocalization.format(
+                    "Failed: %@",
+                    language: AppLocalization.currentLanguage(),
+                    dir))
             }
         }
 
         self.cliStatus = results.isEmpty
-            ? "No writable bin dirs found."
+            ? "No writable bin dirs found.".appLocalized
             : results.joined(separator: " · ")
     }
 

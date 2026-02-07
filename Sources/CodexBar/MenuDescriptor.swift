@@ -86,7 +86,9 @@ struct MenuDescriptor {
                     sections.append(accountSection)
                 }
             } else {
-                sections.append(Section(entries: [.text("No usage configured.", .secondary)]))
+                sections.append(Section(entries: [
+                    .text(AppLocalization.string("No usage configured.", language: settings.appLanguage), .secondary),
+                ]))
             }
         }
 
@@ -94,7 +96,7 @@ struct MenuDescriptor {
         if !actions.entries.isEmpty {
             sections.append(actions)
         }
-        sections.append(Self.metaSection(updateReady: updateReady))
+        sections.append(Self.metaSection(updateReady: updateReady, language: settings.appLanguage))
 
         return MenuDescriptor(sections: sections)
     }
@@ -146,11 +148,16 @@ struct MenuDescriptor {
                 if cost.currencyCode == "Quota" {
                     let used = String(format: "%.0f", cost.used)
                     let limit = String(format: "%.0f", cost.limit)
-                    entries.append(.text("Quota: \(used) / \(limit)", .primary))
+                    let quotaTitle = AppLocalization.format(
+                        "Quota: %@ / %@",
+                        language: settings.appLanguage,
+                        used,
+                        limit)
+                    entries.append(.text(quotaTitle, .primary))
                 }
             }
         } else {
-            entries.append(.text("No usage yet", .secondary))
+            entries.append(.text(AppLocalization.string("No usage yet", language: settings.appLanguage), .secondary))
         }
 
         let usageContext = ProviderMenuUsageContext(
@@ -178,7 +185,8 @@ struct MenuDescriptor {
             snapshot: snapshot,
             metadata: metadata,
             fallback: account,
-            hidePersonalInfo: settings.hidePersonalInfo)
+            hidePersonalInfo: settings.hidePersonalInfo,
+            language: settings.appLanguage)
         guard !entries.isEmpty else { return nil }
         return Section(entries: entries)
     }
@@ -188,7 +196,8 @@ struct MenuDescriptor {
         snapshot: UsageSnapshot?,
         metadata: ProviderMetadata,
         fallback: AccountInfo,
-        hidePersonalInfo: Bool) -> [Entry]
+        hidePersonalInfo: Bool,
+        language: AppLanguage) -> [Entry]
     {
         var entries: [Entry] = []
         let emailText = snapshot?.accountEmail(for: provider)?
@@ -198,19 +207,35 @@ struct MenuDescriptor {
         let redactedEmail = PersonalInfoRedactor.redactEmail(emailText, isEnabled: hidePersonalInfo)
 
         if let emailText, !emailText.isEmpty {
-            entries.append(.text("Account: \(redactedEmail)", .secondary))
+            let accountTitle = AppLocalization.format(
+                "Account: %@",
+                language: language,
+                redactedEmail)
+            entries.append(.text(accountTitle, .secondary))
         }
         if let planText, !planText.isEmpty {
-            entries.append(.text("Plan: \(AccountFormatter.plan(planText))", .secondary))
+            let title = AppLocalization.format(
+                "Plan: %@",
+                language: language,
+                AccountFormatter.plan(planText))
+            entries.append(.text(title, .secondary))
         }
 
         if metadata.usesAccountFallback {
             if emailText?.isEmpty ?? true, let fallbackEmail = fallback.email, !fallbackEmail.isEmpty {
                 let redacted = PersonalInfoRedactor.redactEmail(fallbackEmail, isEnabled: hidePersonalInfo)
-                entries.append(.text("Account: \(redacted)", .secondary))
+                let title = AppLocalization.format(
+                    "Account: %@",
+                    language: language,
+                    redacted)
+                entries.append(.text(title, .secondary))
             }
             if planText?.isEmpty ?? true, let fallbackPlan = fallback.plan, !fallbackPlan.isEmpty {
-                entries.append(.text("Plan: \(AccountFormatter.plan(fallbackPlan))", .secondary))
+                let title = AppLocalization.format(
+                    "Plan: %@",
+                    language: language,
+                    AccountFormatter.plan(fallbackPlan))
+                entries.append(.text(title, .secondary))
             }
         }
 
@@ -258,7 +283,9 @@ struct MenuDescriptor {
             } else {
                 let loginAction = self.switchAccountTarget(for: provider, store: store)
                 let hasAccount = self.hasAccount(for: provider, store: store, account: account)
-                let accountLabel = hasAccount ? "Switch Account..." : "Add Account..."
+                let accountLabel = hasAccount
+                    ? AppLocalization.string("Switch Account...", language: store.settings.appLanguage)
+                    : AppLocalization.string("Add Account...", language: store.settings.appLanguage)
                 entries.append(.action(accountLabel, loginAction))
             }
         }
@@ -274,10 +301,14 @@ struct MenuDescriptor {
         }
 
         if metadata?.dashboardURL != nil {
-            entries.append(.action("Usage Dashboard", .dashboard))
+            entries.append(.action(
+                AppLocalization.string("Usage Dashboard", language: store.settings.appLanguage),
+                .dashboard))
         }
         if metadata?.statusPageURL != nil || metadata?.statusLinkURL != nil {
-            entries.append(.action("Status Page", .statusPage))
+            entries.append(.action(
+                AppLocalization.string("Status Page", language: store.settings.appLanguage),
+                .statusPage))
         }
 
         if let statusLine = self.statusLine(for: provider, store: store) {
@@ -287,15 +318,17 @@ struct MenuDescriptor {
         return Section(entries: entries)
     }
 
-    private static func metaSection(updateReady: Bool) -> Section {
+    private static func metaSection(updateReady: Bool, language: AppLanguage) -> Section {
         var entries: [Entry] = []
         if updateReady {
-            entries.append(.action("Update ready, restart now?", .installUpdate))
+            entries.append(.action(
+                AppLocalization.string("Update ready, restart now?", language: language),
+                .installUpdate))
         }
         entries.append(contentsOf: [
-            .action("Settings...", .settings),
-            .action("About CodexBar", .about),
-            .action("Quit", .quit),
+            .action(AppLocalization.string("Settings...", language: language), .settings),
+            .action(AppLocalization.string("About CodexBar", language: language), .about),
+            .action(AppLocalization.string("Quit", language: language), .quit),
         ])
         return Section(entries: entries)
     }

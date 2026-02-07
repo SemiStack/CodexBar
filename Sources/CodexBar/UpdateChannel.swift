@@ -10,18 +10,18 @@ enum UpdateChannel: String, CaseIterable, Codable, Sendable {
     var displayName: String {
         switch self {
         case .stable:
-            "Stable"
+            AppLocalization.ui("Stable")
         case .beta:
-            "Beta"
+            AppLocalization.ui("Beta")
         }
     }
 
     var description: String {
         switch self {
         case .stable:
-            "Receive only stable, production-ready releases."
+            AppLocalization.ui("Receive only stable, production-ready releases.")
         case .beta:
-            "Receive stable releases plus beta previews."
+            AppLocalization.ui("Receive stable releases plus beta previews.")
         }
     }
 

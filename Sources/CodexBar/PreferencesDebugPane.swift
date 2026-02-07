@@ -420,7 +420,7 @@ struct DebugPane: View {
 
     private var displayedLog: String {
         if self.logText.isEmpty {
-            return self.isLoadingLog ? "Loading…" : "No log yet. Fetch to load."
+            return self.isLoadingLog ? "Loading…".appLocalized : "No log yet. Fetch to load.".appLocalized
         }
         return self.logText
     }
@@ -458,7 +458,7 @@ struct DebugPane: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.callout.weight(.semibold))
-            Text(value ?? "Not found")
+            Text(value ?? "Not found".appLocalized)
                 .font(.system(.footnote, design: .monospaced))
                 .foregroundStyle(value == nil ? .secondary : .primary)
         }
@@ -486,22 +486,28 @@ struct DebugPane: View {
         defer { self.isClearingCostCache = false }
 
         if let error = await self.store.clearCostUsageCache() {
-            self.costCacheStatus = "Failed: \(error)"
+            self.costCacheStatus = AppLocalization.format(
+                "Failed: %@",
+                language: AppLocalization.currentLanguage(),
+                error)
             return
         }
 
-        self.costCacheStatus = "Cleared."
+        self.costCacheStatus = "Cleared.".appLocalized
     }
 
     private func fetchAttemptsText(for provider: UsageProvider) -> String {
         let attempts = self.store.fetchAttempts(for: provider)
-        guard !attempts.isEmpty else { return "No fetch attempts yet." }
+        guard !attempts.isEmpty else { return "No fetch attempts yet.".appLocalized }
         return attempts.map { attempt in
             let kind = Self.fetchKindLabel(attempt.kind)
             var line = "\(attempt.strategyID) (\(kind))"
-            line += attempt.wasAvailable ? " available" : " unavailable"
+            line += attempt.wasAvailable ? " available".appLocalized : " unavailable".appLocalized
             if let error = attempt.errorDescription, !error.isEmpty {
-                line += " error=\(error)"
+                line += AppLocalization.format(
+                    " error=%@",
+                    language: AppLocalization.currentLanguage(),
+                    error)
             }
             return line
         }.joined(separator: "\n")

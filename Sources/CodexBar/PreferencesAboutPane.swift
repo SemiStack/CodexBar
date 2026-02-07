@@ -51,10 +51,16 @@ struct AboutPane: View {
             VStack(spacing: 2) {
                 Text("CodexBar")
                     .font(.title3).bold()
-                Text("Version \(self.versionString)")
+                Text(AppLocalization.format(
+                    "Version %@",
+                    language: AppLocalization.selectedLanguage(),
+                    self.versionString))
                     .foregroundStyle(.secondary)
                 if let buildTimestamp {
-                    Text("Built \(buildTimestamp)")
+                    Text(AppLocalization.format(
+                        "Built %@",
+                        language: AppLocalization.selectedLanguage(),
+                        buildTimestamp))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -105,7 +111,9 @@ struct AboutPane: View {
                     Button("Check for Updates…") { self.updater.checkForUpdates(nil) }
                 }
             } else {
-                Text(self.updater.unavailableReason ?? "Updates unavailable in this build.")
+                Text(self.updater.unavailableReason ?? AppLocalization.string(
+                    "Updates unavailable in this build.",
+                    language: AppLocalization.selectedLanguage()))
                     .foregroundStyle(.secondary)
             }
 
