@@ -227,7 +227,7 @@ struct StatusMenuTests {
     }
 
     @Test
-    func showsCreditsBeforeCostInCodexMenuCardSections() throws {
+    func hidesCodexCreditsSectionEvenWhenCreditsExist() {
         self.disableMenuCardsForTesting()
         let settings = self.makeSettings()
         settings.statusChecksEnabled = false
@@ -288,9 +288,8 @@ struct StatusMenuTests {
         let ids = menu.items.compactMap { $0.representedObject as? String }
         let creditsIndex = ids.firstIndex(of: "menuCardCredits")
         let costIndex = ids.firstIndex(of: "menuCardCost")
-        #expect(creditsIndex != nil)
+        #expect(creditsIndex == nil)
         #expect(costIndex != nil)
-        #expect(try #require(creditsIndex) < costIndex!)
     }
 
     @Test

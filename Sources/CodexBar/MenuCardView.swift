@@ -653,9 +653,7 @@ extension UsageMenuCardView.Model {
             metadata: input.metadata)
         let metrics = Self.metrics(input: input)
         let creditsText: String? = if input.provider == .codex {
-            input.showOptionalCreditsAndExtraUsage
-                ? Self.creditsLine(metadata: input.metadata, credits: input.credits, error: input.creditsError)
-                : nil
+            nil
         } else {
             Self.creditsLine(metadata: input.metadata, credits: input.credits, error: input.creditsError)
         }
