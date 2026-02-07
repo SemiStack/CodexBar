@@ -31,6 +31,20 @@ struct StatusMenuTests {
             syntheticTokenStore: NoopSyntheticTokenStore())
     }
 
+    private func makeCodexSnapshot(email: String, updatedAt: Date) -> UsageSnapshot {
+        let identity = ProviderIdentitySnapshot(
+            providerID: .codex,
+            accountEmail: email,
+            accountOrganization: nil,
+            loginMethod: "Team")
+        return UsageSnapshot(
+            primary: RateWindow(usedPercent: 12, windowMinutes: 300, resetsAt: nil, resetDescription: nil),
+            secondary: RateWindow(usedPercent: 34, windowMinutes: 10080, resetsAt: nil, resetDescription: nil),
+            tertiary: nil,
+            updatedAt: updatedAt,
+            identity: identity)
+    }
+
     @Test
     func remembersProviderWhenMenuOpens() {
         self.disableMenuCardsForTesting()
@@ -290,6 +304,129 @@ struct StatusMenuTests {
         let costIndex = ids.firstIndex(of: "menuCardCost")
         #expect(creditsIndex == nil)
         #expect(costIndex != nil)
+    }
+
+    @Test
+    func hidesTopCodexAccountSwitcherAndAddsSwitchActionToInactiveCard() {
+        self.disableMenuCardsForTesting()
+        let settings = self.makeSettings()
+        settings.statusChecksEnabled = false
+        settings.refreshFrequency = .manual
+        settings.mergeIcons = true
+        settings.selectedMenuProvider = .codex
+
+        let registry = ProviderRegistry.shared
+        if let codexMeta = registry.metadata[.codex] {
+            settings.setProviderEnabled(provider: .codex, metadata: codexMeta, enabled: true)
+        }
+        if let claudeMeta = registry.metadata[.claude] {
+            settings.setProviderEnabled(provider: .claude, metadata: claudeMeta, enabled: false)
+        }
+        if let geminiMeta = registry.metadata[.gemini] {
+            settings.setProviderEnabled(provider: .gemini, metadata: geminiMeta, enabled: false)
+        }
+
+        let fetcher = UsageFetcher()
+        let store = UsageStore(fetcher: fetcher, browserDetection: BrowserDetection(cacheTTL: 0), settings: settings)
+        let now = Date()
+        let activeEmail = "active@example.com"
+        let inactiveEmail = "inactive@example.com"
+        let activeSnapshot = self.makeCodexSnapshot(email: activeEmail, updatedAt: now)
+        let inactiveSnapshot = self.makeCodexSnapshot(email: inactiveEmail, updatedAt: now.addingTimeInterval(-300))
+        store._setSnapshotForTesting(activeSnapshot, provider: .codex)
+        store.codexActiveAccountEmail = activeEmail
+        store.codexCachedAccounts = [
+            CodexCachedAccountRecord(
+                email: activeEmail,
+                snapshot: activeSnapshot,
+                credits: nil,
+                dashboard: nil,
+                sourceLabel: nil,
+                lastError: nil,
+                updatedAt: now),
+            CodexCachedAccountRecord(
+                email: inactiveEmail,
+                snapshot: inactiveSnapshot,
+                credits: nil,
+                dashboard: nil,
+                sourceLabel: nil,
+                lastError: nil,
+                updatedAt: now.addingTimeInterval(-300)),
+        ]
+
+        let controller = StatusItemController(
+            store: store,
+            settings: settings,
+            account: fetcher.loadAccountInfo(),
+            updater: DisabledUpdaterController(),
+            preferencesSelection: PreferencesSelection(),
+            statusBar: self.makeStatusBarForTesting())
+
+        let menu = controller.makeMenu()
+        controller.menuWillOpen(menu)
+
+        #expect(menu.items.contains { $0.view is CodexAccountSwitcherView } == false)
+        let switchItem = menu.items.first {
+            ($0.representedObject as? SwitchAccountActionPayload)?.targetEmail == inactiveEmail
+        }
+        #expect(switchItem != nil)
+        #expect(switchItem?.action == #selector(StatusItemController.runSwitchAccount(_:)))
+        #expect(switchItem?.isEnabled == true)
+    }
+
+    @Test
+    func keepsAddAccountActionEnabledWhileCodexLoginIsInProgress() {
+        self.disableMenuCardsForTesting()
+        let settings = self.makeSettings()
+        settings.statusChecksEnabled = false
+        settings.refreshFrequency = .manual
+        settings.mergeIcons = true
+        settings.selectedMenuProvider = .codex
+
+        let registry = ProviderRegistry.shared
+        if let codexMeta = registry.metadata[.codex] {
+            settings.setProviderEnabled(provider: .codex, metadata: codexMeta, enabled: true)
+        }
+        if let claudeMeta = registry.metadata[.claude] {
+            settings.setProviderEnabled(provider: .claude, metadata: claudeMeta, enabled: false)
+        }
+        if let geminiMeta = registry.metadata[.gemini] {
+            settings.setProviderEnabled(provider: .gemini, metadata: geminiMeta, enabled: false)
+        }
+
+        let fetcher = UsageFetcher()
+        let store = UsageStore(fetcher: fetcher, browserDetection: BrowserDetection(cacheTTL: 0), settings: settings)
+        store._setSnapshotForTesting(
+            self.makeCodexSnapshot(email: "active@example.com", updatedAt: Date()),
+            provider: .codex)
+
+        let controller = StatusItemController(
+            store: store,
+            settings: settings,
+            account: fetcher.loadAccountInfo(),
+            updater: DisabledUpdaterController(),
+            preferencesSelection: PreferencesSelection(),
+            statusBar: self.makeStatusBarForTesting())
+
+        controller.activeLoginProvider = .codex
+        controller.loginTargetEmail = "inactive@example.com"
+        controller.loginPhase = .waitingBrowser
+        controller.loginTask = Task { @MainActor in }
+        defer {
+            controller.loginTask?.cancel()
+            controller.loginTask = nil
+            controller.activeLoginProvider = nil
+            controller.loginTargetEmail = nil
+            controller.loginPhase = .idle
+        }
+
+        let menu = controller.makeMenu()
+        controller.menuWillOpen(menu)
+        let addTitle = AppLocalization.string("Add Account...", language: settings.appLanguage)
+        let addAccountItem = menu.items.first { $0.title == addTitle }
+        #expect(addAccountItem != nil)
+        #expect(addAccountItem?.action == #selector(StatusItemController.runSwitchAccount(_:)))
+        #expect(addAccountItem?.isEnabled == true)
     }
 
     @Test

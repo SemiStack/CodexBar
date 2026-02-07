@@ -60,6 +60,12 @@ struct UsageMenuCardView: View {
             let errorCopyText: String?
         }
 
+        enum AccountSelectionState: Sendable {
+            case none
+            case selected
+            case unselected
+        }
+
         struct ProviderCostSection: Sendable {
             let title: String
             let percentUsed: Double
@@ -71,6 +77,7 @@ struct UsageMenuCardView: View {
         let subtitleText: String
         let subtitleStyle: SubtitleStyle
         let planText: String?
+        let accountSelectionState: AccountSelectionState
         let metrics: [Metric]
         let creditsText: String?
         let creditsRemaining: Double?
@@ -210,6 +217,18 @@ private struct UsageMenuCardHeaderView: View {
                 Spacer()
                 if self.model.subtitleStyle == .error, !self.model.subtitleText.isEmpty {
                     CopyIconButton(copyText: self.model.subtitleText, isHighlighted: self.isHighlighted)
+                }
+                switch self.model.accountSelectionState {
+                case .none:
+                    EmptyView()
+                case .selected:
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                case .unselected:
+                    Image(systemName: "circle")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
                 }
                 if let plan = self.model.planText {
                     Text(plan)
@@ -601,6 +620,7 @@ extension UsageMenuCardView.Model {
         let hidePersonalInfo: Bool
         let now: Date
         let subtitleOverride: SubtitleOverride?
+        let accountSelectionState: AccountSelectionState
 
         init(
             provider: UsageProvider,
@@ -621,7 +641,8 @@ extension UsageMenuCardView.Model {
             showOptionalCreditsAndExtraUsage: Bool,
             hidePersonalInfo: Bool,
             now: Date,
-            subtitleOverride: SubtitleOverride? = nil)
+            subtitleOverride: SubtitleOverride? = nil,
+            accountSelectionState: AccountSelectionState = .none)
         {
             self.provider = provider
             self.metadata = metadata
@@ -642,6 +663,7 @@ extension UsageMenuCardView.Model {
             self.hidePersonalInfo = hidePersonalInfo
             self.now = now
             self.subtitleOverride = subtitleOverride
+            self.accountSelectionState = accountSelectionState
         }
     }
 
@@ -682,6 +704,7 @@ extension UsageMenuCardView.Model {
             subtitleText: redacted.subtitleText,
             subtitleStyle: subtitle.style,
             planText: planText,
+            accountSelectionState: input.accountSelectionState,
             metrics: metrics,
             creditsText: creditsText,
             creditsRemaining: input.provider == .codex ? nil : input.credits?.remaining,

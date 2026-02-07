@@ -120,14 +120,24 @@ extension StatusItemController {
     }
 
     func startSwitchAccount(provider: UsageProvider, targetEmail: String?) {
-        if self.loginTask != nil {
-            self.loginLogger.info("Switch Account tap ignored: login already in-flight")
-            return
-        }
-
         let normalizedTarget = targetEmail?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+        self.loginAttemptGeneration &+= 1
+        let attempt = self.loginAttemptGeneration
+        if let existing = self.loginTask {
+            existing.cancel()
+            self.loginLogger.info(
+                "Cancelled in-flight login before starting a new one",
+                metadata: [
+                    "provider": provider.rawValue,
+                    "targetEmail": normalizedTarget ?? "",
+                ])
+        }
+
+        self.activeLoginProvider = provider
+        self.loginTargetEmail = normalizedTarget
+        self.loginPhase = .requesting
         self.loginLogger.info(
             "Switch Account tapped",
             metadata: [
@@ -138,13 +148,13 @@ extension StatusItemController {
         self.loginTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
-                self.activeLoginProvider = nil
-                self.loginTargetEmail = nil
-                self.loginTask = nil
+                if self.loginAttemptGeneration == attempt {
+                    self.activeLoginProvider = nil
+                    self.loginTargetEmail = nil
+                    self.loginPhase = .idle
+                    self.loginTask = nil
+                }
             }
-            self.activeLoginProvider = provider
-            self.loginTargetEmail = normalizedTarget
-            self.loginPhase = .requesting
             self.loginLogger.info(
                 "Starting login task",
                 metadata: [
@@ -153,6 +163,7 @@ extension StatusItemController {
                 ])
 
             let shouldRefresh = await self.runLoginFlow(provider: provider)
+            guard !Task.isCancelled else { return }
             if shouldRefresh {
                 await self.store.refresh()
                 self.loginLogger.info("Triggered refresh after login", metadata: ["provider": provider.rawValue])

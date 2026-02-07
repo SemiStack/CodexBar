@@ -308,17 +308,23 @@ extension StatusItemController {
 
     private func addMenuCards(to menu: NSMenu, context: MenuCardContext) -> Bool {
         if let codexAccountDisplay = context.codexAccountDisplay, codexAccountDisplay.showAllCards {
-            let cards = codexAccountDisplay.accounts.compactMap { account in
-                let subtitleOverride = account.cacheNotice.map {
-                    UsageMenuCardView.Model.SubtitleOverride(text: $0, style: account.isActive ? .error : .info)
+            let cards: [(CodexAccountDisplay, UsageMenuCardView.Model)] = codexAccountDisplay.accounts
+                .compactMap { account in
+                    let subtitleOverride = account.cacheNotice.map {
+                        UsageMenuCardView.Model.SubtitleOverride(text: $0, style: account.isActive ? .error : .info)
+                    }
+                    guard let model = self.menuCardModel(
+                        for: .codex,
+                        snapshotOverride: account.snapshot,
+                        errorOverride: nil,
+                        subtitleOverride: subtitleOverride,
+                        accountOverride: AccountInfo(email: nil, plan: nil),
+                        accountSelectionState: account.isActive ? .selected : .unselected)
+                    else {
+                        return nil
+                    }
+                    return (account, model)
                 }
-                return self.menuCardModel(
-                    for: .codex,
-                    snapshotOverride: account.snapshot,
-                    errorOverride: nil,
-                    subtitleOverride: subtitleOverride,
-                    accountOverride: AccountInfo(email: nil, plan: nil))
-            }
 
             if cards.isEmpty, let model = self.menuCardModel(for: context.selectedProvider) {
                 menu.addItem(self.makeMenuCardItem(
@@ -327,11 +333,23 @@ extension StatusItemController {
                     width: context.menuWidth))
                 menu.addItem(.separator())
             } else {
-                for (index, model) in cards.enumerated() {
-                    menu.addItem(self.makeMenuCardItem(
-                        UsageMenuCardView(model: model, width: context.menuWidth),
-                        id: "menuCard-codex-\(index)",
-                        width: context.menuWidth))
+                for (index, card) in cards.enumerated() {
+                    let id = "menuCard-codex-\(index)"
+                    let item = self.makeMenuCardItem(
+                        UsageMenuCardView(model: card.1, width: context.menuWidth),
+                        id: id,
+                        width: context.menuWidth,
+                        onClick: card.0.isActive ? nil : { [weak self] in
+                            self?.startSwitchAccount(provider: .codex, targetEmail: card.0.email)
+                        })
+                    if !card.0.isActive {
+                        item.target = self
+                        item.action = #selector(self.runSwitchAccount(_:))
+                        item.representedObject = SwitchAccountActionPayload(
+                            provider: .codex,
+                            targetEmail: card.0.email)
+                    }
+                    menu.addItem(item)
                     if index < cards.count - 1 {
                         menu.addItem(.separator())
                     }
@@ -462,7 +480,6 @@ extension StatusItemController {
                     if case let .switchAccount(targetProvider, _) = action,
                        let subtitle = self.switchAccountSubtitle(for: targetProvider)
                     {
-                        item.isEnabled = false
                         self.applySubtitle(subtitle, to: item, title: title)
                     }
                     menu.addItem(item)
@@ -599,7 +616,7 @@ extension StatusItemController {
             accounts: accounts,
             activeEmail: activeEmail,
             showAllCards: true,
-            showSwitcher: true)
+            showSwitcher: false)
     }
 
     private func menuNeedsRefresh(_ menu: NSMenu) -> Bool {
@@ -677,7 +694,7 @@ extension StatusItemController {
         // Re-measure the menu card height right before display to avoid stale/incorrect sizing when content
         // changes (e.g. dashboard error lines causing wrapping).
         let cardItems = menu.items.filter { item in
-            (item.representedObject as? String)?.hasPrefix("menuCard") == true
+            self.menuItemID(for: item)?.hasPrefix("menuCard") == true
         }
         for item in cardItems {
             guard let view = item.view else { continue }
@@ -693,12 +710,14 @@ extension StatusItemController {
         _ view: some View,
         id: String,
         width: CGFloat,
-        submenu: NSMenu? = nil) -> NSMenuItem
+        submenu: NSMenu? = nil,
+        onClick: (() -> Void)? = nil) -> NSMenuItem
     {
         if !Self.menuCardRenderingEnabled {
             let item = NSMenuItem()
             item.isEnabled = true
             item.representedObject = id
+            item.identifier = NSUserInterfaceItemIdentifier(id)
             item.submenu = submenu
             if submenu != nil {
                 item.target = self
@@ -714,7 +733,7 @@ extension StatusItemController {
         {
             view.environment(\.locale, self.settings.appLocale)
         }
-        let hosting = MenuCardItemHostingView(rootView: wrapped, highlightState: highlightState)
+        let hosting = MenuCardItemHostingView(rootView: wrapped, highlightState: highlightState, onClick: onClick)
         // Set frame with target width immediately
         let height = self.menuCardHeight(for: hosting, width: width)
         hosting.frame = NSRect(origin: .zero, size: NSSize(width: width, height: height))
@@ -722,6 +741,7 @@ extension StatusItemController {
         item.view = hosting
         item.isEnabled = true
         item.representedObject = id
+        item.identifier = NSUserInterfaceItemIdentifier(id)
         item.submenu = submenu
         if submenu != nil {
             item.target = self
@@ -934,6 +954,7 @@ extension StatusItemController {
     private final class MenuCardItemHostingView<Content: View>: NSHostingView<Content>, MenuCardHighlighting,
     MenuCardMeasuring {
         private let highlightState: MenuCardHighlightState
+        private let onClick: (() -> Void)?
         override var allowsVibrancy: Bool {
             true
         }
@@ -944,13 +965,15 @@ extension StatusItemController {
             return NSSize(width: self.frame.width, height: size.height)
         }
 
-        init(rootView: Content, highlightState: MenuCardHighlightState) {
+        init(rootView: Content, highlightState: MenuCardHighlightState, onClick: (() -> Void)? = nil) {
             self.highlightState = highlightState
+            self.onClick = onClick
             super.init(rootView: rootView)
         }
 
         required init(rootView: Content) {
             self.highlightState = MenuCardHighlightState()
+            self.onClick = nil
             super.init(rootView: rootView)
         }
 
@@ -963,6 +986,14 @@ extension StatusItemController {
             let controller = NSHostingController(rootView: self.rootView)
             let measured = controller.sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude))
             return measured.height
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            guard let onClick else {
+                super.mouseDown(with: event)
+                return
+            }
+            onClick()
         }
 
         func setHighlighted(_ highlighted: Bool) {
@@ -1227,7 +1258,7 @@ extension StatusItemController {
             "costHistoryChart",
         ]
         return menu.items.contains { item in
-            guard let id = item.representedObject as? String else { return false }
+            guard let id = self.menuItemID(for: item) else { return false }
             return ids.contains(id)
         }
     }
@@ -1238,9 +1269,16 @@ extension StatusItemController {
             "creditsHistoryChart",
         ]
         return menu.items.contains { item in
-            guard let id = item.representedObject as? String else { return false }
+            guard let id = self.menuItemID(for: item) else { return false }
             return ids.contains(id)
         }
+    }
+
+    private func menuItemID(for item: NSMenuItem) -> String? {
+        if let id = item.representedObject as? String {
+            return id
+        }
+        return item.identifier?.rawValue
     }
 
     private func refreshHostedSubviewHeights(in menu: NSMenu) {
@@ -1261,7 +1299,8 @@ extension StatusItemController {
         snapshotOverride: UsageSnapshot? = nil,
         errorOverride: String? = nil,
         subtitleOverride: UsageMenuCardView.Model.SubtitleOverride? = nil,
-        accountOverride: AccountInfo? = nil) -> UsageMenuCardView.Model?
+        accountOverride: AccountInfo? = nil,
+        accountSelectionState: UsageMenuCardView.Model.AccountSelectionState = .none) -> UsageMenuCardView.Model?
     {
         let target = provider ?? self.store.enabledProviders().first ?? .codex
         let metadata = self.store.metadata(for: target)
@@ -1315,7 +1354,8 @@ extension StatusItemController {
             showOptionalCreditsAndExtraUsage: self.settings.showOptionalCreditsAndExtraUsage,
             hidePersonalInfo: self.settings.hidePersonalInfo,
             now: Date(),
-            subtitleOverride: subtitleOverride)
+            subtitleOverride: subtitleOverride,
+            accountSelectionState: accountSelectionState)
         return UsageMenuCardView.Model.make(input)
     }
 
