@@ -435,6 +435,79 @@ enum AntigravityAccountManager {
         self.log.info("Antigravity account switched", metadata: ["email": normalized])
     }
 
+    static func refreshCachedInactiveAccounts(using store: UsageStore) async {
+        guard !SettingsStore.isRunningTests else { return }
+        let activeEmail = store.currentAntigravityActiveEmail()
+        let credentials = self.refreshableCredentials(
+            from: AntigravityOAuthCredentialStore.allCredentials(),
+            activeEmail: activeEmail)
+        guard !credentials.isEmpty else { return }
+
+        AntigravityInteractionDebugLog.append(
+            "refreshCachedInactiveAccounts started",
+            metadata: [
+                "activeEmail": activeEmail ?? "",
+                "candidateCount": String(credentials.count),
+            ])
+
+        for credential in credentials {
+            if Task.isCancelled { break }
+            let email = credential.email
+            var resolvedCredential = credential
+
+            do {
+                resolvedCredential = try await self.refreshCredentialIfNeeded(credential)
+                if resolvedCredential.accessToken != credential.accessToken ||
+                    resolvedCredential.refreshToken != credential.refreshToken ||
+                    resolvedCredential.accessTokenExpiry != credential.accessTokenExpiry ||
+                    resolvedCredential.updatedAt != credential.updatedAt
+                {
+                    AntigravityOAuthCredentialStore.upsert(resolvedCredential)
+                }
+            } catch {
+                AntigravityInteractionDebugLog.append(
+                    "refreshCachedInactiveAccounts credential refresh failed",
+                    metadata: [
+                        "email": email,
+                        "error": error.localizedDescription,
+                    ])
+                continue
+            }
+
+            let snapshot = await self.fetchCachedUsageSnapshotIfPossible(
+                email: email,
+                accessToken: resolvedCredential.accessToken)
+            _ = store.cacheAntigravityAccount(
+                email: email,
+                snapshot: snapshot,
+                markActive: false)
+            AntigravityInteractionDebugLog.append(
+                "refreshCachedInactiveAccounts account updated",
+                metadata: [
+                    "email": email,
+                    "hasSnapshot": snapshot == nil ? "false" : "true",
+                ])
+        }
+
+        AntigravityInteractionDebugLog.append("refreshCachedInactiveAccounts completed")
+    }
+
+    static func refreshableCredentials(
+        from credentials: [AntigravityOAuthCredential],
+        activeEmail: String?) -> [AntigravityOAuthCredential]
+    {
+        let normalizedActive = activeEmail?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return credentials.filter { credential in
+            let normalizedEmail = credential.email
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            guard !normalizedEmail.isEmpty else { return false }
+            return normalizedEmail != normalizedActive
+        }
+    }
+
     static func removeAccount(email: String, using store: UsageStore) throws {
         AntigravityInteractionDebugLog.append(
             "removeAccount started",

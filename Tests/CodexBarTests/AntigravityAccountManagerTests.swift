@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import CodexBar
 
@@ -29,5 +30,42 @@ struct AntigravityAccountManagerTests {
             generatedProjectID: "bamboo-precept-lgxtn")
 
         #expect(candidates == ["bamboo-precept-lgxtn"])
+    }
+
+    @Test
+    func refreshableCredentialsExcludesActiveAccount() {
+        let credentials = [
+            Self.credential(email: "active@example.com"),
+            Self.credential(email: "other@example.com"),
+        ]
+
+        let refreshable = AntigravityAccountManager.refreshableCredentials(
+            from: credentials,
+            activeEmail: "active@example.com")
+
+        #expect(refreshable.map(\.email) == ["other@example.com"])
+    }
+
+    @Test
+    func refreshableCredentialsMatchesActiveEmailCaseInsensitively() {
+        let credentials = [
+            Self.credential(email: "Active@Example.com"),
+            Self.credential(email: "other@example.com"),
+        ]
+
+        let refreshable = AntigravityAccountManager.refreshableCredentials(
+            from: credentials,
+            activeEmail: "active@example.com")
+
+        #expect(refreshable.map(\.email) == ["other@example.com"])
+    }
+
+    private static func credential(email: String) -> AntigravityOAuthCredential {
+        AntigravityOAuthCredential(
+            email: email,
+            accessToken: "token-\(email)",
+            refreshToken: "refresh-\(email)",
+            accessTokenExpiry: Date(timeIntervalSince1970: 1_700_000_000),
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000))
     }
 }

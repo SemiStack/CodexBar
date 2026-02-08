@@ -102,6 +102,7 @@ extension UsageStore {
             self.refreshCodexAccountCacheFromLiveData()
         } else if provider == .antigravity {
             self.refreshAntigravityAccountCacheFromLiveData()
+            await AntigravityAccountManager.refreshCachedInactiveAccounts(using: self)
         }
     }
 }

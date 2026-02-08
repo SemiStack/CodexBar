@@ -213,7 +213,7 @@ extension UsageStore {
         self.persistAntigravityAccountCache()
     }
 
-    private func currentAntigravityActiveEmail() -> String? {
+    func currentAntigravityActiveEmail() -> String? {
         if let normalized = self
             .normalizeAntigravityEmail(self.snapshots[.antigravity]?.accountEmail(for: .antigravity))
         {
