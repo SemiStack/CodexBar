@@ -1,6 +1,6 @@
 import AppKit
-import CodexBarCore
 import Testing
+@testable import CodexBarCore
 @testable import CodexBar
 
 @MainActor
@@ -57,6 +57,15 @@ struct StatusMenuTests {
             tertiary: RateWindow(usedPercent: 55, windowMinutes: nil, resetsAt: nil, resetDescription: nil),
             updatedAt: updatedAt,
             identity: identity)
+    }
+
+    private func makeAntigravityCredential(email: String, updatedAt: Date) -> AntigravityOAuthCredential {
+        AntigravityOAuthCredential(
+            email: email,
+            accessToken: "access-\(email)",
+            refreshToken: "refresh-\(email)",
+            accessTokenExpiry: updatedAt.addingTimeInterval(3600),
+            updatedAt: updatedAt)
     }
 
     @Test
@@ -446,6 +455,12 @@ struct StatusMenuTests {
     @Test
     func addsSwitchActionToInactiveAntigravityCard() {
         self.disableMenuCardsForTesting()
+        let credentialCacheKey = KeychainCacheStore.Key(category: "oauth", identifier: "antigravity.accounts")
+        KeychainCacheStore.setTestStoreForTesting(true)
+        defer {
+            KeychainCacheStore.clear(key: credentialCacheKey)
+            KeychainCacheStore.setTestStoreForTesting(false)
+        }
         let settings = self.makeSettings()
         settings.statusChecksEnabled = false
         settings.refreshFrequency = .manual
@@ -471,6 +486,8 @@ struct StatusMenuTests {
         let now = Date()
         let activeEmail = "ag-active@example.com"
         let inactiveEmail = "ag-inactive@example.com"
+        AntigravityOAuthCredentialStore.upsert(self.makeAntigravityCredential(email: activeEmail, updatedAt: now))
+        AntigravityOAuthCredentialStore.upsert(self.makeAntigravityCredential(email: inactiveEmail, updatedAt: now))
         let activeSnapshot = self.makeAntigravitySnapshot(email: activeEmail, updatedAt: now)
         let inactiveSnapshot = self.makeAntigravitySnapshot(
             email: inactiveEmail,

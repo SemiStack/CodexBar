@@ -19,6 +19,7 @@ extension UsageStore {
     private static let antigravityCachedAccountLimit: Int = 12
 
     func antigravityAccountDisplays() -> [AntigravityAccountDisplay] {
+        self.pruneStaleAntigravityCachedAccounts()
         let activeEmail = self.currentAntigravityActiveEmail()
         var records = self.antigravityCachedAccounts
         if let activeEmail, !records.contains(where: { $0.email == activeEmail }) {
@@ -103,6 +104,7 @@ extension UsageStore {
         record.lastError = (lastError?.isEmpty ?? true) ? nil : lastError
 
         self.upsertAntigravityCachedAccountRecord(record)
+        self.pruneStaleAntigravityCachedAccounts()
     }
 
     func cacheAntigravityAccount(
@@ -182,15 +184,21 @@ extension UsageStore {
     private func pruneStaleAntigravityCachedAccounts() {
         let credentialEmails = Set(AntigravityOAuthCredentialStore.allCredentials().map(\.email))
         let activeEmail = self.antigravityActiveAccountEmail
-        var didPrune = false
+        var prunedEmails: [String] = []
         self.antigravityCachedAccounts.removeAll { record in
             if record.email == activeEmail { return false }
-            if record.snapshot != nil { return false }
             if credentialEmails.contains(record.email) { return false }
-            didPrune = true
+            prunedEmails.append(record.email)
             return true
         }
-        guard didPrune else { return }
+        guard !prunedEmails.isEmpty else { return }
+        AntigravityInteractionDebugLog.append(
+            "pruneStaleAntigravityCachedAccounts removed entries",
+            metadata: [
+                "activeEmail": activeEmail ?? "",
+                "removedEmails": prunedEmails.sorted().joined(separator: ","),
+                "credentialEmails": credentialEmails.sorted().joined(separator: ","),
+            ])
         self.antigravityCachedAccounts = Self.trimAntigravityRecords(
             Self.sortAntigravityRecords(self.antigravityCachedAccounts, activeEmail: activeEmail),
             activeEmail: activeEmail)

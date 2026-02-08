@@ -404,12 +404,7 @@ extension StatusItemController {
                     errorOverride: nil,
                     subtitleOverride: subtitleOverride,
                     accountOverride: AccountInfo(email: account.email, plan: nil),
-                    accountSelectionAction: account.isActive ? nil : { [weak self] in
-                        AntigravityInteractionDebugLog.append(
-                            "codex account selection tapped",
-                            metadata: ["email": account.email])
-                        self?.startSwitchAccount(provider: .codex, targetEmail: account.email)
-                    },
+                    accountSelectionAction: nil,
                     accountSelectionState: account.isActive ? .selected : .unselected)
                 else {
                     return nil
@@ -488,12 +483,7 @@ extension StatusItemController {
                                 self?.removeAntigravityAccount(email: account.email)
                             }),
                     ],
-                    accountSelectionAction: account.isActive ? nil : { [weak self] in
-                        AntigravityInteractionDebugLog.append(
-                            "antigravity account selection tapped",
-                            metadata: ["email": account.email])
-                        self?.startSwitchAccount(provider: .antigravity, targetEmail: account.email)
-                    },
+                    accountSelectionAction: nil,
                     accountSelectionState: account.isActive ? .selected : .unselected)
                 else {
                     return nil
@@ -1141,11 +1131,11 @@ extension StatusItemController {
             guard let hitView = self.hitTest(point) else { return false }
             var current: NSView? = hitView
             while let view = current {
-                if view is NSControl {
+                if view is NSButton {
                     return true
                 }
                 let className = NSStringFromClass(type(of: view)).lowercased()
-                if className.contains("button") || className.contains("control") {
+                if className.contains("button") {
                     return true
                 }
                 current = view.superview

@@ -35,6 +35,14 @@ extension StatusItemController {
                 self.postLoginNotification(for: .antigravity)
             }
         } catch {
+            if Task.isCancelled {
+                AntigravityInteractionDebugLog.append(
+                    "runAntigravityLoginFlow cancelled",
+                    metadata: ["targetEmail": targetEmail ?? ""])
+                self.loginPhase = .idle
+                AntigravityInteractionDebugLog.append("runAntigravityLoginFlow exited")
+                return
+            }
             let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
             let safeMessage = message.isEmpty ? "Unknown Antigravity login error." : message
             AntigravityInteractionDebugLog.append(

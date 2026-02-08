@@ -1,6 +1,6 @@
-import CodexBarCore
 import Foundation
 import Testing
+@testable import CodexBarCore
 @testable import CodexBar
 
 @MainActor
@@ -8,12 +8,22 @@ import Testing
 struct AntigravityAccountDisplayTests {
     @Test
     func keepsPreviousAntigravityAccountAsCachedAfterSwitch() throws {
+        let credentialCacheKey = KeychainCacheStore.Key(category: "oauth", identifier: "antigravity.accounts")
+        KeychainCacheStore.setTestStoreForTesting(true)
+        defer {
+            KeychainCacheStore.clear(key: credentialCacheKey)
+            KeychainCacheStore.setTestStoreForTesting(false)
+        }
+
         let settings = Self.makeSettingsStore(suite: "AntigravityAccountDisplayTests-switch")
         settings.refreshFrequency = .manual
         let store = UsageStore(
             fetcher: UsageFetcher(environment: [:]),
             browserDetection: BrowserDetection(cacheTTL: 0),
             settings: settings)
+
+        AntigravityOAuthCredentialStore.upsert(Self.makeCredential(email: "first@example.com", updatedAt: Date()))
+        AntigravityOAuthCredentialStore.upsert(Self.makeCredential(email: "second@example.com", updatedAt: Date()))
 
         let firstSnapshot = Self.makeSnapshot(
             email: "first@example.com",
@@ -74,12 +84,22 @@ struct AntigravityAccountDisplayTests {
 
     @Test
     func addingAccountKeepsCurrentActiveAccount() throws {
+        let credentialCacheKey = KeychainCacheStore.Key(category: "oauth", identifier: "antigravity.accounts")
+        KeychainCacheStore.setTestStoreForTesting(true)
+        defer {
+            KeychainCacheStore.clear(key: credentialCacheKey)
+            KeychainCacheStore.setTestStoreForTesting(false)
+        }
+
         let settings = Self.makeSettingsStore(suite: "AntigravityAccountDisplayTests-add-keep-active")
         settings.refreshFrequency = .manual
         let store = UsageStore(
             fetcher: UsageFetcher(environment: [:]),
             browserDetection: BrowserDetection(cacheTTL: 0),
             settings: settings)
+
+        AntigravityOAuthCredentialStore.upsert(Self.makeCredential(email: "active@example.com", updatedAt: Date()))
+        AntigravityOAuthCredentialStore.upsert(Self.makeCredential(email: "new@example.com", updatedAt: Date()))
 
         let activeSnapshot = Self.makeSnapshot(
             email: "active@example.com",
@@ -103,6 +123,13 @@ struct AntigravityAccountDisplayTests {
 
     @Test
     func displaySnapshotIdentityUsesRecordEmail() throws {
+        let credentialCacheKey = KeychainCacheStore.Key(category: "oauth", identifier: "antigravity.accounts")
+        KeychainCacheStore.setTestStoreForTesting(true)
+        defer {
+            KeychainCacheStore.clear(key: credentialCacheKey)
+            KeychainCacheStore.setTestStoreForTesting(false)
+        }
+
         let settings = Self.makeSettingsStore(suite: "AntigravityAccountDisplayTests-identity-fix")
         settings.refreshFrequency = .manual
         let store = UsageStore(
@@ -113,6 +140,8 @@ struct AntigravityAccountDisplayTests {
         let activeEmail = "active@example.com"
         let cachedEmail = "cached@example.com"
         let now = Date()
+        AntigravityOAuthCredentialStore.upsert(Self.makeCredential(email: activeEmail, updatedAt: now))
+        AntigravityOAuthCredentialStore.upsert(Self.makeCredential(email: cachedEmail, updatedAt: now))
         let activeSnapshot = Self.makeSnapshot(email: activeEmail, updatedAt: now)
         store.snapshots[.antigravity] = activeSnapshot
         store.antigravityActiveAccountEmail = activeEmail
@@ -172,5 +201,14 @@ struct AntigravityAccountDisplayTests {
             providerCost: nil,
             updatedAt: updatedAt,
             identity: identity)
+    }
+
+    private static func makeCredential(email: String, updatedAt: Date) -> AntigravityOAuthCredential {
+        AntigravityOAuthCredential(
+            email: email,
+            accessToken: "access-\(email)",
+            refreshToken: "refresh-\(email)",
+            accessTokenExpiry: updatedAt.addingTimeInterval(3600),
+            updatedAt: updatedAt)
     }
 }

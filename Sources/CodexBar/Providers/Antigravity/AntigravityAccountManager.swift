@@ -1,8 +1,14 @@
+// swiftlint:disable file_length
 import AppKit
 import CodexBarCore
 import Foundation
 import Network
 import SQLite3
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 enum AntigravityAccountManagerError: LocalizedError {
     case accountEmailUnavailable
@@ -22,43 +28,52 @@ enum AntigravityAccountManagerError: LocalizedError {
     case databaseOpenFailed(String)
     case databaseWriteFailed(String)
     case callbackListenerFailed(String)
+    case antigravityLaunchFailed(String)
+    case antigravitySwitchVerificationFailed(expected: String, observed: String?)
 
     var errorDescription: String? {
         switch self {
         case .accountEmailUnavailable:
-            "Could not determine the Antigravity account email."
+            return "Could not determine the Antigravity account email."
         case let .accountNotAdded(email):
-            "Account \(email) has not been added yet."
+            return "Account \(email) has not been added yet."
         case .oauthBrowserOpenFailed:
-            "Could not open browser for Google sign-in."
+            return "Could not open browser for Google sign-in."
         case .oauthCodeMissing:
-            "Google OAuth callback did not include an authorization code."
+            return "Google OAuth callback did not include an authorization code."
         case .oauthStateMismatch:
-            "Google OAuth state mismatch. Please retry."
+            return "Google OAuth state mismatch. Please retry."
         case .oauthTimedOut:
-            "Google OAuth timed out. Please retry."
+            return "Google OAuth timed out. Please retry."
         case .oauthCancelled:
-            "Google OAuth was cancelled."
+            return "Google OAuth was cancelled."
         case let .oauthTokenExchangeFailed(details):
-            "Google OAuth token exchange failed: \(details)"
+            return "Google OAuth token exchange failed: \(details)"
         case let .oauthUserInfoFailed(details):
-            "Failed to fetch Google account profile: \(details)"
+            return "Failed to fetch Google account profile: \(details)"
         case let .oauthRefreshFailed(details):
-            "Failed to refresh Google token: \(details)"
+            return "Failed to refresh Google token: \(details)"
         case .oauthRefreshTokenMissing:
-            "Google did not return a refresh token. Revoke access and retry."
+            return "Google did not return a refresh token. Revoke access and retry."
         case let .apiRequestFailed(details):
-            "Failed to fetch Antigravity account usage: \(details)"
+            return "Failed to fetch Antigravity account usage: \(details)"
         case let .cannotRemoveActiveAccount(email):
-            "Cannot remove active account \(email). Switch to another account first."
+            return "Cannot remove active account \(email). Switch to another account first."
         case .databaseNotFound:
-            "Antigravity state database was not found."
+            return "Antigravity state database was not found."
         case let .databaseOpenFailed(details):
-            "Failed to open Antigravity state database: \(details)"
+            return "Failed to open Antigravity state database: \(details)"
         case let .databaseWriteFailed(details):
-            "Failed to update Antigravity state database: \(details)"
+            return "Failed to update Antigravity state database: \(details)"
         case let .callbackListenerFailed(details):
-            "Failed to start OAuth callback listener: \(details)"
+            return "Failed to start OAuth callback listener: \(details)"
+        case let .antigravityLaunchFailed(details):
+            return "Failed to relaunch Antigravity: \(details)"
+        case let .antigravitySwitchVerificationFailed(expected, observed):
+            if let observed, !observed.isEmpty {
+                return "Switched credentials to \(expected), but Antigravity still reports \(observed)."
+            }
+            return "Switched credentials to \(expected), but Antigravity did not report an active account in time."
         }
     }
 }
@@ -331,6 +346,8 @@ enum AntigravityAccountManager {
     private static let unifiedOAuthKey = "antigravityUnifiedStateSync.oauthToken"
     private static let legacyOAuthKey = "jetskiStateSync.agentManagerInitState"
     private static let onboardingKey = "antigravityOnboarding"
+    private static let switchRelaunchTimeout: TimeInterval = 14
+    private static let switchTerminateTimeout: TimeInterval = 4
 
     static func addCurrentAccount(using store: UsageStore) async throws -> String {
         AntigravityInteractionDebugLog.append("addCurrentAccount started")
@@ -415,15 +432,43 @@ enum AntigravityAccountManager {
         guard !normalized.isEmpty else {
             throw AntigravityAccountManagerError.accountEmailUnavailable
         }
+
+        let cachedCredentialEmails = AntigravityOAuthCredentialStore.allCredentials().map(\.email).sorted()
+        AntigravityInteractionDebugLog.append(
+            "switchAccount credential lookup",
+            metadata: [
+                "targetEmail": normalized,
+                "credentialCount": String(cachedCredentialEmails.count),
+                "credentialEmails": cachedCredentialEmails.joined(separator: ","),
+                "activeEmail": store.currentAntigravityActiveEmail() ?? "",
+            ])
+
         guard var credential = AntigravityOAuthCredentialStore.credential(for: normalized) else {
+            if store.currentAntigravityActiveEmail() != normalized {
+                store.removeAntigravityCachedAccount(email: normalized)
+            }
+            AntigravityInteractionDebugLog.append(
+                "switchAccount missing credential",
+                metadata: [
+                    "targetEmail": normalized,
+                    "credentialEmails": cachedCredentialEmails.joined(separator: ","),
+                ])
             throw AntigravityAccountManagerError.accountNotAdded(normalized)
         }
 
         credential = try await self.refreshCredentialIfNeeded(credential)
         AntigravityOAuthCredentialStore.upsert(credential)
 
+        let runningProcess = await self.currentAntigravityLanguageServerProcess()
+        let appURL = self.resolveAntigravityAppURL(runningProcess: runningProcess)
         let databaseURL = try await self.resolveDatabaseURL()
         try self.injectCredential(credential, databaseURL: databaseURL)
+        if !SettingsStore.isRunningTests {
+            try await self.reloadAntigravityRuntimeIfNeeded(
+                runningProcess: runningProcess,
+                appURL: appURL,
+                expectedEmail: normalized)
+        }
 
         store.markAntigravityActiveAccount(email: normalized)
         AntigravityInteractionDebugLog.append(
@@ -1258,6 +1303,53 @@ enum AntigravityAccountManager {
         return result
     }
 
+    private struct LanguageServerProcess {
+        let pid: pid_t
+        let commandLine: String
+    }
+
+    private static func reloadAntigravityRuntimeIfNeeded(
+        runningProcess: LanguageServerProcess?,
+        appURL: URL?,
+        expectedEmail: String) async throws
+    {
+        var processesByPID: [pid_t: LanguageServerProcess] = [:]
+        if let runningProcess {
+            processesByPID[runningProcess.pid] = runningProcess
+        }
+        let runtimeProcesses = await self.currentAntigravityRuntimeProcesses(appURL: appURL)
+        for process in runtimeProcesses {
+            processesByPID[process.pid] = process
+        }
+        let processesToTerminate = processesByPID.values.sorted { $0.pid < $1.pid }
+        if !processesToTerminate.isEmpty {
+            let sortedPids = processesToTerminate.map(\.pid)
+            let commandPreview = processesToTerminate
+                .prefix(4)
+                .map { "\($0.pid):\($0.commandLine.prefix(120))" }
+                .joined(separator: " | ")
+            AntigravityInteractionDebugLog.append(
+                "switchAccount restarting runtime",
+                metadata: [
+                    "pids": sortedPids.map(String.init).joined(separator: ","),
+                    "processCount": String(processesToTerminate.count),
+                    "appURL": appURL?.path ?? "",
+                    "preview": commandPreview,
+                ])
+            await self.terminateProcesses(processesToTerminate, appURL: appURL, timeout: self.switchTerminateTimeout)
+        }
+
+        if let appURL {
+            try await self.launchAntigravityApp(at: appURL)
+        } else if !processesToTerminate.isEmpty {
+            throw AntigravityAccountManagerError.antigravityLaunchFailed("Antigravity.app path unavailable")
+        } else {
+            return
+        }
+
+        try await self.waitForLiveAccountEmail(expected: expectedEmail, timeout: self.switchRelaunchTimeout)
+    }
+
     private static func resolveDatabaseURL() async throws -> URL {
         if let processDerived = await self.databaseURLFromRunningProcess(),
            FileManager.default.fileExists(atPath: processDerived.path)
@@ -1292,22 +1384,335 @@ enum AntigravityAccountManager {
     }
 
     private static func currentAntigravityLanguageServerCommandLine() async -> String? {
+        await self.currentAntigravityLanguageServerProcess()?.commandLine
+    }
+
+    private static func currentAntigravityRuntimeProcesses(appURL: URL?) async -> [LanguageServerProcess] {
         guard let output = try? await self.runCommand(
             binary: "/bin/ps",
-            arguments: ["-ax", "-o", "command="],
+            arguments: ["-ax", "-o", "pid=,command="],
+            timeout: 6,
+            tolerateFailure: false)
+        else {
+            return []
+        }
+
+        let normalizedAppPath = appURL?.standardizedFileURL.path.lowercased()
+        var result: [LanguageServerProcess] = []
+        for line in output.split(separator: "\n") {
+            let trimmed = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+            let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard parts.count == 2, let pid = Int32(parts[0]) else { continue }
+            let command = String(parts[1])
+            let lower = command.lowercased()
+            if let normalizedAppPath {
+                guard lower.contains(normalizedAppPath) else { continue }
+            } else {
+                guard lower.contains("antigravity.app/contents/") else { continue }
+            }
+            result.append(LanguageServerProcess(pid: pid_t(pid), commandLine: command))
+        }
+        return result
+    }
+
+    private static func currentAntigravityLanguageServerProcess() async -> LanguageServerProcess? {
+        guard let output = try? await self.runCommand(
+            binary: "/bin/ps",
+            arguments: ["-ax", "-o", "pid=,command="],
             timeout: 6,
             tolerateFailure: false)
         else {
             return nil
         }
         for line in output.split(separator: "\n") {
-            let command = String(line)
+            let trimmed = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+            let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard parts.count == 2, let pid = Int32(parts[0]) else { continue }
+            let command = String(parts[1])
             let lower = command.lowercased()
             guard lower.contains("language_server_macos") else { continue }
             guard lower.contains("antigravity") else { continue }
-            return command
+            return LanguageServerProcess(pid: pid_t(pid), commandLine: command)
         }
         return nil
+    }
+
+    private static func resolveAntigravityAppURL(runningProcess: LanguageServerProcess?) -> URL? {
+        if let runningProcess,
+           let derived = self.antigravityAppURL(from: runningProcess.commandLine)
+        {
+            return derived
+        }
+        return self.defaultAntigravityAppURL()
+    }
+
+    private static func antigravityAppURL(from commandLine: String) -> URL? {
+        let pattern = #"(/[^\\n]*?\.app)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+            return nil
+        }
+        let range = NSRange(commandLine.startIndex..<commandLine.endIndex, in: commandLine)
+        guard let match = regex.firstMatch(in: commandLine, options: [], range: range),
+              let valueRange = Range(match.range(at: 1), in: commandLine)
+        else {
+            return nil
+        }
+        let rawPath = String(commandLine[valueRange]).replacingOccurrences(of: "\\ ", with: " ")
+        let appURL = URL(fileURLWithPath: rawPath).standardizedFileURL
+        guard FileManager.default.fileExists(atPath: appURL.path) else { return nil }
+        return appURL
+    }
+
+    private static func defaultAntigravityAppURL() -> URL? {
+        let fileManager = FileManager.default
+        let candidates = [
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Antigravity.app"),
+            URL(fileURLWithPath: "/Applications/Antigravity.app"),
+        ]
+        return candidates.first(where: { fileManager.fileExists(atPath: $0.path) })
+    }
+
+    private static func terminateProcesses(
+        _ processes: [LanguageServerProcess],
+        appURL: URL?,
+        timeout: TimeInterval) async
+    {
+        let targetPIDs = Set(processes.map(\.pid))
+        guard !targetPIDs.isEmpty else { return }
+
+        let (gracefulRequested, bundleID, appCount) = self.requestGracefulAntigravityQuit(appURL: appURL)
+        if gracefulRequested {
+            AntigravityInteractionDebugLog.append(
+                "switchAccount requested graceful quit",
+                metadata: [
+                    "bundleID": bundleID ?? "",
+                    "appCount": String(appCount),
+                ])
+        } else {
+            let fallbackPIDs = self.mainProcessPIDs(from: processes)
+            let targets = fallbackPIDs.isEmpty ? Array(targetPIDs).sorted() : fallbackPIDs
+            AntigravityInteractionDebugLog.append(
+                "switchAccount graceful quit unavailable; sending SIGTERM",
+                metadata: [
+                    "bundleID": bundleID ?? "",
+                    "targetPIDs": targets.map(String.init).joined(separator: ","),
+                ])
+            self.sendSignal(SIGTERM, to: targets)
+        }
+
+        var remaining = await self.waitForProcessesToExit(targetPIDs, timeout: timeout)
+        if remaining.isEmpty {
+            AntigravityInteractionDebugLog.append(
+                "switchAccount runtime exited gracefully",
+                metadata: ["targetCount": String(targetPIDs.count)])
+            return
+        }
+
+        remaining.sort()
+        AntigravityInteractionDebugLog.append(
+            "switchAccount force killing remaining runtime",
+            metadata: ["remainingPIDs": remaining.map(String.init).joined(separator: ",")])
+        self.sendSignal(SIGKILL, to: remaining)
+
+        let finalRemaining = await self.waitForProcessesToExit(Set(remaining), timeout: 2.0)
+        if finalRemaining.isEmpty {
+            AntigravityInteractionDebugLog.append(
+                "switchAccount runtime terminated after force kill",
+                metadata: ["targetCount": String(targetPIDs.count)])
+        } else {
+            AntigravityInteractionDebugLog.append(
+                "switchAccount runtime still alive after force kill",
+                metadata: [
+                    "remainingPIDs": finalRemaining.map(String.init).joined(separator: ","),
+                ])
+        }
+    }
+
+    private static func requestGracefulAntigravityQuit(appURL: URL?) -> (Bool, String?, Int) {
+        let bundleID = self.antigravityBundleIdentifier(appURL: appURL)
+        let applications: [NSRunningApplication] = {
+            if let bundleID {
+                return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            }
+            if let appURL {
+                let normalized = appURL.standardizedFileURL.path.lowercased()
+                return NSWorkspace.shared.runningApplications.filter {
+                    $0.bundleURL?.standardizedFileURL.path.lowercased() == normalized
+                }
+            }
+            return []
+        }()
+
+        guard !applications.isEmpty else {
+            return (false, bundleID, 0)
+        }
+
+        var requested = false
+        for application in applications where !application.isTerminated {
+            if application.terminate() {
+                requested = true
+            }
+        }
+        return (requested, bundleID, applications.count)
+    }
+
+    private static func antigravityBundleIdentifier(appURL: URL?) -> String? {
+        if let appURL,
+           let bundleID = Bundle(url: appURL)?.bundleIdentifier,
+           !bundleID.isEmpty
+        {
+            return bundleID
+        }
+        if let running = NSWorkspace.shared.runningApplications.first(where: {
+            let name = $0.localizedName?.lowercased() ?? ""
+            let bundleID = $0.bundleIdentifier?.lowercased() ?? ""
+            return name.contains("antigravity") || bundleID.contains("antigravity")
+        }) {
+            return running.bundleIdentifier
+        }
+        return nil
+    }
+
+    private static func mainProcessPIDs(from processes: [LanguageServerProcess]) -> [pid_t] {
+        let helperMarkers = [
+            "helper",
+            "renderer",
+            "gpu",
+            "utility",
+            "sandbox",
+            "plugin",
+            "crashpad",
+            "audio",
+            "language_server",
+            "--type=",
+        ]
+        let mainPIDs = processes.compactMap { process -> pid_t? in
+            let lower = process.commandLine.lowercased()
+            guard !helperMarkers.contains(where: { lower.contains($0) }) else { return nil }
+            guard lower.contains("antigravity.app/contents/macos/") else { return nil }
+            return process.pid
+        }
+        if !mainPIDs.isEmpty {
+            return mainPIDs.sorted()
+        }
+        return []
+    }
+
+    private static func sendSignal(_ signal: Int32, to pids: [pid_t]) {
+        for pid in pids where pid > 0 {
+            _ = kill(pid, signal)
+        }
+    }
+
+    private static func waitForProcessesToExit(_ pids: Set<pid_t>, timeout: TimeInterval) async -> [pid_t] {
+        guard !pids.isEmpty else { return [] }
+
+        let deadline = Date().addingTimeInterval(max(0.2, timeout))
+        var remaining = self.alivePIDs(in: pids)
+        while !remaining.isEmpty, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            remaining = self.alivePIDs(in: pids)
+        }
+        return remaining.sorted()
+    }
+
+    private static func alivePIDs(in pids: Set<pid_t>) -> [pid_t] {
+        pids.filter { self.isProcessAlive($0) }
+    }
+
+    private static func isProcessAlive(_ pid: pid_t) -> Bool {
+        guard pid > 0 else { return false }
+        if kill(pid, 0) == 0 {
+            return true
+        }
+        return errno == EPERM
+    }
+
+    private static func launchAntigravityApp(at appURL: URL) async throws {
+        do {
+            _ = try await self.runCommand(
+                binary: "/usr/bin/open",
+                arguments: ["-a", appURL.path],
+                timeout: 10,
+                tolerateFailure: false)
+            AntigravityInteractionDebugLog.append(
+                "switchAccount relaunched app",
+                metadata: ["path": appURL.path])
+        } catch {
+            throw AntigravityAccountManagerError.antigravityLaunchFailed(error.localizedDescription)
+        }
+    }
+
+    private static func waitForLiveAccountEmail(expected: String, timeout: TimeInterval) async throws {
+        let normalizedExpected = expected
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !normalizedExpected.isEmpty else { return }
+
+        let deadline = Date().addingTimeInterval(max(1, timeout))
+        var lastObservedEmail: String?
+        var lastError: String?
+        var attempt = 0
+        while Date() < deadline {
+            if Task.isCancelled {
+                AntigravityInteractionDebugLog.append(
+                    "switchAccount live email wait cancelled",
+                    metadata: [
+                        "expected": normalizedExpected,
+                        "attempt": String(attempt),
+                    ])
+                return
+            }
+            attempt += 1
+            let remaining = max(1, min(4, deadline.timeIntervalSinceNow))
+            do {
+                let snapshot = try await AntigravityStatusProbe(timeout: remaining).fetch()
+                let observed = snapshot.accountEmail?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+                if let observed, !observed.isEmpty {
+                    lastObservedEmail = observed
+                }
+                AntigravityInteractionDebugLog.append(
+                    "switchAccount live email poll",
+                    metadata: [
+                        "attempt": String(attempt),
+                        "expected": normalizedExpected,
+                        "observed": observed ?? "",
+                    ])
+                if observed == normalizedExpected {
+                    AntigravityInteractionDebugLog.append(
+                        "switchAccount live email verified",
+                        metadata: [
+                            "expected": normalizedExpected,
+                            "observed": observed ?? "",
+                        ])
+                    return
+                }
+            } catch {
+                let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                lastError = message.isEmpty ? String(describing: error) : message
+                AntigravityInteractionDebugLog.append(
+                    "switchAccount live email poll failed",
+                    metadata: [
+                        "attempt": String(attempt),
+                        "expected": normalizedExpected,
+                        "error": lastError ?? "",
+                    ])
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        AntigravityInteractionDebugLog.append(
+            "switchAccount live email mismatch",
+            metadata: [
+                "expected": normalizedExpected,
+                "observed": lastObservedEmail ?? "",
+                "lastError": lastError ?? "",
+            ])
+        throw AntigravityAccountManagerError.antigravitySwitchVerificationFailed(
+            expected: normalizedExpected,
+            observed: lastObservedEmail)
     }
 
     private static func extractFlag(_ flag: String, from commandLine: String) -> String? {
@@ -1407,3 +1812,4 @@ enum AntigravityAccountManager {
 }
 
 // swiftlint:enable type_body_length
+// swiftlint:enable file_length
