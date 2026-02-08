@@ -494,4 +494,58 @@ struct MenuCardModelTests {
         #expect(model.creditsHintCopyText?.isEmpty == true)
         #expect(model.creditsHintText?.contains("codex@example.com") == false)
     }
+
+    @Test
+    func antigravityAccountCardUsesOverrideEmailWithoutSnapshot() throws {
+        let metadata = try #require(ProviderDefaults.metadata[.antigravity])
+        let model = UsageMenuCardView.Model.make(.init(
+            provider: .antigravity,
+            metadata: metadata,
+            snapshot: nil,
+            credits: nil,
+            creditsError: nil,
+            dashboard: nil,
+            dashboardError: nil,
+            tokenSnapshot: nil,
+            tokenError: nil,
+            account: AccountInfo(email: "second@example.com", plan: "Pro"),
+            isRefreshing: false,
+            lastError: nil,
+            usageBarsShowUsed: false,
+            resetTimeDisplayStyle: .countdown,
+            tokenCostUsageEnabled: false,
+            showOptionalCreditsAndExtraUsage: true,
+            hidePersonalInfo: false,
+            now: Date(),
+            accountSelectionState: .unselected))
+
+        #expect(model.email == "second@example.com")
+    }
+
+    @Test
+    func antigravityRegularCardDoesNotUseOverrideEmailWithoutSnapshot() throws {
+        let metadata = try #require(ProviderDefaults.metadata[.antigravity])
+        let model = UsageMenuCardView.Model.make(.init(
+            provider: .antigravity,
+            metadata: metadata,
+            snapshot: nil,
+            credits: nil,
+            creditsError: nil,
+            dashboard: nil,
+            dashboardError: nil,
+            tokenSnapshot: nil,
+            tokenError: nil,
+            account: AccountInfo(email: "second@example.com", plan: "Pro"),
+            isRefreshing: false,
+            lastError: nil,
+            usageBarsShowUsed: false,
+            resetTimeDisplayStyle: .countdown,
+            tokenCostUsageEnabled: false,
+            showOptionalCreditsAndExtraUsage: true,
+            hidePersonalInfo: false,
+            now: Date(),
+            accountSelectionState: .none))
+
+        #expect(model.email.isEmpty)
+    }
 }

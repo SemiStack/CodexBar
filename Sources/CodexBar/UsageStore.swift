@@ -26,6 +26,8 @@ extension UsageStore {
         _ = self.openAIDashboardCookieImportDebugLog
         _ = self.codexCachedAccounts
         _ = self.codexActiveAccountEmail
+        _ = self.antigravityCachedAccounts
+        _ = self.antigravityActiveAccountEmail
         _ = self.versions
         _ = self.isRefreshing
         _ = self.refreshingProviders
@@ -158,6 +160,8 @@ final class UsageStore {
     var openAIDashboardCookieImportDebugLog: String?
     var codexCachedAccounts: [CodexCachedAccountRecord] = []
     var codexActiveAccountEmail: String?
+    var antigravityCachedAccounts: [AntigravityCachedAccountRecord] = []
+    var antigravityActiveAccountEmail: String?
     var versions: [UsageProvider: String] = [:]
     var isRefreshing = false
     var refreshingProviders: Set<UsageProvider> = []
@@ -234,6 +238,7 @@ final class UsageStore {
             implementation.makeRuntime().map { (implementation.id, $0) }
         })
         self.loadCodexAccountCache()
+        self.loadAntigravityAccountCache()
         self.logStartupState()
         self.bindSettings()
         self.detectVersions()
@@ -453,6 +458,7 @@ final class UsageStore {
         }
 
         self.refreshCodexAccountCacheFromLiveData()
+        self.refreshAntigravityAccountCacheFromLiveData()
         self.persistWidgetSnapshot(reason: "refresh")
     }
 

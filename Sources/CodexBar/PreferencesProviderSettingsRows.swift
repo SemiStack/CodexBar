@@ -338,6 +338,18 @@ struct ProviderSettingsCodexAccountsRowView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                if let removeAccount = self.descriptor.removeAccount {
+                                    Button {
+                                        removeAccount(account.email)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.footnote.weight(.semibold))
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .controlSize(.small)
+                                    .foregroundStyle(.secondary)
+                                    .help("Delete account".appLocalized)
+                                }
                             }
                         }
                     }

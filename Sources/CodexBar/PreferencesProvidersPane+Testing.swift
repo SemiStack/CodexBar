@@ -193,7 +193,8 @@ enum ProvidersPaneTestHarness {
                 ]
             },
             addAccount: {},
-            switchAccount: { _ in })
+            switchAccount: { _ in },
+            removeAccount: nil)
 
         return ProviderListTestDescriptors(
             toggle: toggle,

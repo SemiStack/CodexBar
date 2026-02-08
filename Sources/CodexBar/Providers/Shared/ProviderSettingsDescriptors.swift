@@ -125,6 +125,7 @@ struct ProviderSettingsCodexAccountsDescriptor: Identifiable {
     let accounts: () -> [ProviderSettingsCodexAccountItem]
     let addAccount: () -> Void
     let switchAccount: (_ email: String) -> Void
+    let removeAccount: ((_ email: String) -> Void)?
 }
 
 /// Shared picker descriptor rendered in the Providers settings pane.

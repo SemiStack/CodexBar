@@ -106,6 +106,13 @@ extension StatusItemController {
 
     @objc func runSwitchAccount(_ sender: NSMenuItem) {
         let payload = sender.representedObject as? SwitchAccountActionPayload
+        AntigravityInteractionDebugLog.append(
+            "runSwitchAccount invoked",
+            metadata: [
+                "payloadPresent": payload == nil ? "false" : "true",
+                "representedType": String(describing: type(of: sender.representedObject)),
+                "menuTitle": sender.title,
+            ])
         let provider: UsageProvider
         let targetEmail: String?
         if let payload {
@@ -123,6 +130,15 @@ extension StatusItemController {
         let normalizedTarget = targetEmail?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+        self.dismissOpenMenusForAccountAction()
+        AntigravityInteractionDebugLog.append(
+            "startSwitchAccount called",
+            metadata: [
+                "provider": provider.rawValue,
+                "targetEmail": normalizedTarget ?? "",
+                "activeLoginProvider": self.activeLoginProvider?.rawValue ?? "",
+                "logFile": AntigravityInteractionDebugLog.logFilePath,
+            ])
         self.loginAttemptGeneration &+= 1
         let attempt = self.loginAttemptGeneration
         if let existing = self.loginTask {
@@ -149,6 +165,12 @@ extension StatusItemController {
             guard let self else { return }
             defer {
                 if self.loginAttemptGeneration == attempt {
+                    AntigravityInteractionDebugLog.append(
+                        "loginTask defer reset",
+                        metadata: [
+                            "provider": provider.rawValue,
+                            "targetEmail": normalizedTarget ?? "",
+                        ])
                     self.activeLoginProvider = nil
                     self.loginTargetEmail = nil
                     self.loginPhase = .idle
@@ -161,11 +183,41 @@ extension StatusItemController {
                     "provider": provider.rawValue,
                     "targetEmail": normalizedTarget ?? "",
                 ])
+            AntigravityInteractionDebugLog.append(
+                "loginTask started",
+                metadata: [
+                    "provider": provider.rawValue,
+                    "targetEmail": normalizedTarget ?? "",
+                ])
 
             let shouldRefresh = await self.runLoginFlow(provider: provider)
+            AntigravityInteractionDebugLog.append(
+                "runLoginFlow completed",
+                metadata: [
+                    "provider": provider.rawValue,
+                    "targetEmail": normalizedTarget ?? "",
+                    "shouldRefresh": shouldRefresh ? "true" : "false",
+                    "cancelled": Task.isCancelled ? "true" : "false",
+                ])
             guard !Task.isCancelled else { return }
             if shouldRefresh {
                 await self.store.refresh()
+                self.refreshOpenMenusAfterAccountAction()
+                let liveEmail = self.store.snapshot(for: .antigravity)?
+                    .accountEmail(for: .antigravity)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased() ?? ""
+                let activeEmail = self.store.antigravityAccountDisplays()
+                    .first(where: { $0.isActive })?
+                    .email ?? ""
+                AntigravityInteractionDebugLog.append(
+                    "post-refresh antigravity state",
+                    metadata: [
+                        "provider": provider.rawValue,
+                        "targetEmail": normalizedTarget ?? "",
+                        "liveEmail": liveEmail,
+                        "activeEmail": activeEmail,
+                    ])
                 self.loginLogger.info("Triggered refresh after login", metadata: ["provider": provider.rawValue])
                 if provider == .codex, let normalizedTarget {
                     let activeEmail = self.store.codexAccountEmailForOpenAIDashboard()?
@@ -183,6 +235,43 @@ extension StatusItemController {
                     }
                 }
             }
+        }
+    }
+
+    func removeAntigravityAccount(email: String) {
+        let normalized = email
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !normalized.isEmpty else { return }
+        if self.antigravityRemovalInFlightEmails.contains(normalized) {
+            AntigravityInteractionDebugLog.append(
+                "removeAntigravityAccount skipped (already in flight)",
+                metadata: ["email": normalized])
+            return
+        }
+        self.antigravityRemovalInFlightEmails.insert(normalized)
+        defer { self.antigravityRemovalInFlightEmails.remove(normalized) }
+        self.dismissOpenMenusForAccountAction()
+        AntigravityInteractionDebugLog.append(
+            "removeAntigravityAccount called",
+            metadata: ["email": normalized])
+        do {
+            try AntigravityAccountManager.removeAccount(email: normalized, using: self.store)
+            AntigravityInteractionDebugLog.append(
+                "removeAntigravityAccount succeeded",
+                metadata: ["email": normalized])
+            self.refreshOpenMenusAfterAccountAction()
+        } catch {
+            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            AntigravityInteractionDebugLog.append(
+                "removeAntigravityAccount failed",
+                metadata: [
+                    "email": normalized,
+                    "error": message,
+                ])
+            self.presentLoginAlert(
+                title: "Antigravity remove account failed",
+                message: message.isEmpty ? "Unknown error." : message)
         }
     }
 
@@ -431,5 +520,21 @@ extension StatusItemController {
         case .cancelled: "cancelled"
         case let .failed(message): "failed(\(message))"
         }
+    }
+
+    private func dismissOpenMenusForAccountAction() {
+        let menus = Array(self.openMenus.values)
+        guard !menus.isEmpty else { return }
+        AntigravityInteractionDebugLog.append(
+            "dismissOpenMenusForAccountAction",
+            metadata: ["openMenuCount": String(menus.count)])
+        for menu in menus {
+            menu.cancelTracking()
+        }
+    }
+
+    private func refreshOpenMenusAfterAccountAction() {
+        self.menuContentVersion &+= 1
+        self.refreshOpenMenusIfNeeded()
     }
 }

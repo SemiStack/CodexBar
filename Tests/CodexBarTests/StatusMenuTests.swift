@@ -45,6 +45,20 @@ struct StatusMenuTests {
             identity: identity)
     }
 
+    private func makeAntigravitySnapshot(email: String, updatedAt: Date) -> UsageSnapshot {
+        let identity = ProviderIdentitySnapshot(
+            providerID: .antigravity,
+            accountEmail: email,
+            accountOrganization: nil,
+            loginMethod: "Team")
+        return UsageSnapshot(
+            primary: RateWindow(usedPercent: 20, windowMinutes: 300, resetsAt: nil, resetDescription: nil),
+            secondary: RateWindow(usedPercent: 40, windowMinutes: 10080, resetsAt: nil, resetDescription: nil),
+            tertiary: RateWindow(usedPercent: 55, windowMinutes: nil, resetsAt: nil, resetDescription: nil),
+            updatedAt: updatedAt,
+            identity: identity)
+    }
+
     @Test
     func remembersProviderWhenMenuOpens() {
         self.disableMenuCardsForTesting()
@@ -427,6 +441,76 @@ struct StatusMenuTests {
         #expect(addAccountItem != nil)
         #expect(addAccountItem?.action == #selector(StatusItemController.runSwitchAccount(_:)))
         #expect(addAccountItem?.isEnabled == true)
+    }
+
+    @Test
+    func addsSwitchActionToInactiveAntigravityCard() {
+        self.disableMenuCardsForTesting()
+        let settings = self.makeSettings()
+        settings.statusChecksEnabled = false
+        settings.refreshFrequency = .manual
+        settings.mergeIcons = true
+        settings.selectedMenuProvider = .antigravity
+
+        let registry = ProviderRegistry.shared
+        if let antigravityMeta = registry.metadata[.antigravity] {
+            settings.setProviderEnabled(provider: .antigravity, metadata: antigravityMeta, enabled: true)
+        }
+        if let codexMeta = registry.metadata[.codex] {
+            settings.setProviderEnabled(provider: .codex, metadata: codexMeta, enabled: false)
+        }
+        if let claudeMeta = registry.metadata[.claude] {
+            settings.setProviderEnabled(provider: .claude, metadata: claudeMeta, enabled: false)
+        }
+        if let geminiMeta = registry.metadata[.gemini] {
+            settings.setProviderEnabled(provider: .gemini, metadata: geminiMeta, enabled: false)
+        }
+
+        let fetcher = UsageFetcher()
+        let store = UsageStore(fetcher: fetcher, browserDetection: BrowserDetection(cacheTTL: 0), settings: settings)
+        let now = Date()
+        let activeEmail = "ag-active@example.com"
+        let inactiveEmail = "ag-inactive@example.com"
+        let activeSnapshot = self.makeAntigravitySnapshot(email: activeEmail, updatedAt: now)
+        let inactiveSnapshot = self.makeAntigravitySnapshot(
+            email: inactiveEmail,
+            updatedAt: now.addingTimeInterval(-300))
+        store._setSnapshotForTesting(activeSnapshot, provider: .antigravity)
+        store.antigravityActiveAccountEmail = activeEmail
+        store.antigravityCachedAccounts = [
+            AntigravityCachedAccountRecord(
+                email: activeEmail,
+                snapshot: activeSnapshot,
+                sourceLabel: nil,
+                lastError: nil,
+                updatedAt: now),
+            AntigravityCachedAccountRecord(
+                email: inactiveEmail,
+                snapshot: inactiveSnapshot,
+                sourceLabel: nil,
+                lastError: nil,
+                updatedAt: now.addingTimeInterval(-300)),
+        ]
+
+        let controller = StatusItemController(
+            store: store,
+            settings: settings,
+            account: fetcher.loadAccountInfo(),
+            updater: DisabledUpdaterController(),
+            preferencesSelection: PreferencesSelection(),
+            statusBar: self.makeStatusBarForTesting())
+
+        let menu = controller.makeMenu()
+        controller.menuWillOpen(menu)
+
+        #expect(menu.items.contains { $0.view is CodexAccountSwitcherView } == false)
+        let switchItem = menu.items.first {
+            guard let payload = $0.representedObject as? SwitchAccountActionPayload else { return false }
+            return payload.provider == .antigravity && payload.targetEmail == inactiveEmail
+        }
+        #expect(switchItem != nil)
+        #expect(switchItem?.action == #selector(StatusItemController.runSwitchAccount(_:)))
+        #expect(switchItem?.isEnabled == true)
     }
 
     @Test

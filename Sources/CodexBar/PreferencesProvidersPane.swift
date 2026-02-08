@@ -214,33 +214,80 @@ struct ProvidersPane: View {
     }
 
     func codexAccountsDescriptor(for provider: UsageProvider) -> ProviderSettingsCodexAccountsDescriptor? {
-        guard provider == .codex else { return nil }
-        return ProviderSettingsCodexAccountsDescriptor(
-            id: "codex-cached-accounts",
-            title: "Accounts".appLocalized,
-            subtitle: "Add another account, then click any non-current account to switch login.",
-            addAccountTitle: "Add Account...",
-            isVisible: { true },
-            accounts: {
-                self.store.codexAccountDisplays().map { account in
-                    let redacted = PersonalInfoRedactor.redactEmail(
-                        account.email,
-                        isEnabled: self.settings.hidePersonalInfo)
-                    let detail = account.cacheNotice ?? account.updatedAt.map { UsageFormatter.updatedString(from: $0) }
-                    return ProviderSettingsCodexAccountItem(
-                        email: account.email,
-                        displayName: redacted,
-                        detailText: detail,
-                        isActive: account.isActive,
-                        isUsingCachedData: account.isUsingCachedData)
-                }
-            },
-            addAccount: {
-                self.requestProviderLogin(provider: .codex, targetEmail: nil)
-            },
-            switchAccount: { email in
-                self.requestProviderLogin(provider: .codex, targetEmail: email)
-            })
+        switch provider {
+        case .codex:
+            ProviderSettingsCodexAccountsDescriptor(
+                id: "codex-cached-accounts",
+                title: "Accounts".appLocalized,
+                subtitle: "Add another account, then click any non-current account to switch login.",
+                addAccountTitle: "Add Account...",
+                isVisible: { true },
+                accounts: {
+                    self.store.codexAccountDisplays().map { account in
+                        let redacted = PersonalInfoRedactor.redactEmail(
+                            account.email,
+                            isEnabled: self.settings.hidePersonalInfo)
+                        let detail = account.cacheNotice ?? account.updatedAt
+                            .map { UsageFormatter.updatedString(from: $0) }
+                        return ProviderSettingsCodexAccountItem(
+                            email: account.email,
+                            displayName: redacted,
+                            detailText: detail,
+                            isActive: account.isActive,
+                            isUsingCachedData: account.isUsingCachedData)
+                    }
+                },
+                addAccount: {
+                    self.requestProviderLogin(provider: .codex, targetEmail: nil)
+                },
+                switchAccount: { email in
+                    self.requestProviderLogin(provider: .codex, targetEmail: email)
+                },
+                removeAccount: nil)
+        case .antigravity:
+            ProviderSettingsCodexAccountsDescriptor(
+                id: "antigravity-cached-accounts",
+                title: "Accounts".appLocalized,
+                subtitle: "Add another account, then click any non-current account to switch login.",
+                addAccountTitle: "Add Account...",
+                isVisible: { true },
+                accounts: {
+                    self.store.antigravityAccountDisplays().map { account in
+                        let redacted = PersonalInfoRedactor.redactEmail(
+                            account.email,
+                            isEnabled: self.settings.hidePersonalInfo)
+                        let detail = account.cacheNotice ?? account.updatedAt
+                            .map { UsageFormatter.updatedString(from: $0) }
+                        return ProviderSettingsCodexAccountItem(
+                            email: account.email,
+                            displayName: redacted,
+                            detailText: detail,
+                            isActive: account.isActive,
+                            isUsingCachedData: account.isUsingCachedData)
+                    }
+                },
+                addAccount: {
+                    self.requestProviderLogin(provider: .antigravity, targetEmail: nil)
+                },
+                switchAccount: { email in
+                    self.requestProviderLogin(provider: .antigravity, targetEmail: email)
+                },
+                removeAccount: { email in
+                    do {
+                        try AntigravityAccountManager.removeAccount(email: email, using: self.store)
+                    } catch {
+                        let logger = CodexBarLog.logger(LogCategories.antigravity)
+                        logger.error(
+                            "Failed to remove Antigravity account",
+                            metadata: [
+                                "email": email,
+                                "error": error.localizedDescription,
+                            ])
+                    }
+                })
+        default:
+            nil
+        }
     }
 
     private func makeSettingsContext(provider: UsageProvider) -> ProviderSettingsContext {

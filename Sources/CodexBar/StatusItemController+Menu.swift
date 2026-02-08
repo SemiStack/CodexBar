@@ -31,6 +31,13 @@ extension StatusItemController {
         let showSwitcher: Bool
     }
 
+    private struct AntigravityAccountMenuDisplay {
+        let accounts: [AntigravityAccountDisplay]
+        let activeEmail: String?
+        let showAllCards: Bool
+        let showSwitcher: Bool
+    }
+
     private func menuCardWidth(for providers: [UsageProvider], menu: NSMenu? = nil) -> CGFloat {
         _ = menu
         return Self.menuCardBaseWidth
@@ -123,11 +130,15 @@ extension StatusItemController {
         let codexAccountDisplay = tokenAccountDisplay == nil
             ? self.codexAccountMenuDisplay(for: currentProvider)
             : nil
+        let antigravityAccountDisplay = tokenAccountDisplay == nil && codexAccountDisplay == nil
+            ? self.antigravityAccountMenuDisplay(for: currentProvider)
+            : nil
         let showAllTokenAccounts = tokenAccountDisplay?.showAll ?? false
         let showAllCodexAccounts = codexAccountDisplay?.showAllCards ?? false
+        let showAllAntigravityAccounts = antigravityAccountDisplay?.showAllCards ?? false
         let openAIContext = self.openAIWebContext(
             currentProvider: currentProvider,
-            showAllTokenAccounts: showAllTokenAccounts || showAllCodexAccounts)
+            showAllTokenAccounts: showAllTokenAccounts || showAllCodexAccounts || showAllAntigravityAccounts)
 
         let hasTokenAccountSwitcher = menu.items.contains { $0.view is TokenAccountSwitcherView }
         let hasCodexAccountSwitcher = menu.items.contains { $0.view is CodexAccountSwitcherView }
@@ -137,6 +148,7 @@ extension StatusItemController {
             switcherProvidersMatch &&
             tokenAccountDisplay == nil &&
             codexAccountDisplay == nil &&
+            antigravityAccountDisplay == nil &&
             !hasTokenAccountSwitcher &&
             !hasCodexAccountSwitcher &&
             !menu.items.isEmpty &&
@@ -177,6 +189,7 @@ extension StatusItemController {
             menuWidth: menuWidth,
             tokenAccountDisplay: tokenAccountDisplay,
             codexAccountDisplay: codexAccountDisplay,
+            antigravityAccountDisplay: antigravityAccountDisplay,
             openAIContext: openAIContext)
         let addedOpenAIWebItems = self.addMenuCards(to: menu, context: menuContext)
         self.addOpenAIWebItemsIfNeeded(
@@ -231,6 +244,7 @@ extension StatusItemController {
             menuWidth: menuWidth,
             tokenAccountDisplay: nil,
             codexAccountDisplay: nil,
+            antigravityAccountDisplay: nil,
             openAIContext: openAIContext)
         let addedOpenAIWebItems = self.addMenuCards(to: menu, context: menuContext)
         self.addOpenAIWebItemsIfNeeded(
@@ -254,6 +268,7 @@ extension StatusItemController {
         let menuWidth: CGFloat
         let tokenAccountDisplay: TokenAccountMenuDisplay?
         let codexAccountDisplay: CodexAccountMenuDisplay?
+        let antigravityAccountDisplay: AntigravityAccountMenuDisplay?
         let openAIContext: OpenAIWebContext
     }
 
@@ -307,57 +322,10 @@ extension StatusItemController {
     }
 
     private func addMenuCards(to menu: NSMenu, context: MenuCardContext) -> Bool {
-        if let codexAccountDisplay = context.codexAccountDisplay, codexAccountDisplay.showAllCards {
-            let cards: [(CodexAccountDisplay, UsageMenuCardView.Model)] = codexAccountDisplay.accounts
-                .compactMap { account in
-                    let subtitleOverride = account.cacheNotice.map {
-                        UsageMenuCardView.Model.SubtitleOverride(text: $0, style: account.isActive ? .error : .info)
-                    }
-                    guard let model = self.menuCardModel(
-                        for: .codex,
-                        snapshotOverride: account.snapshot,
-                        errorOverride: nil,
-                        subtitleOverride: subtitleOverride,
-                        accountOverride: AccountInfo(email: nil, plan: nil),
-                        accountSelectionState: account.isActive ? .selected : .unselected)
-                    else {
-                        return nil
-                    }
-                    return (account, model)
-                }
-
-            if cards.isEmpty, let model = self.menuCardModel(for: context.selectedProvider) {
-                menu.addItem(self.makeMenuCardItem(
-                    UsageMenuCardView(model: model, width: context.menuWidth),
-                    id: "menuCard",
-                    width: context.menuWidth))
-                menu.addItem(.separator())
-            } else {
-                for (index, card) in cards.enumerated() {
-                    let id = "menuCard-codex-\(index)"
-                    let item = self.makeMenuCardItem(
-                        UsageMenuCardView(model: card.1, width: context.menuWidth),
-                        id: id,
-                        width: context.menuWidth,
-                        onClick: card.0.isActive ? nil : { [weak self] in
-                            self?.startSwitchAccount(provider: .codex, targetEmail: card.0.email)
-                        })
-                    if !card.0.isActive {
-                        item.target = self
-                        item.action = #selector(self.runSwitchAccount(_:))
-                        item.representedObject = SwitchAccountActionPayload(
-                            provider: .codex,
-                            targetEmail: card.0.email)
-                    }
-                    menu.addItem(item)
-                    if index < cards.count - 1 {
-                        menu.addItem(.separator())
-                    }
-                }
-                if !cards.isEmpty {
-                    menu.addItem(.separator())
-                }
-            }
+        if self.addCodexAccountCardsIfNeeded(to: menu, context: context) {
+            return false
+        }
+        if self.addAntigravityAccountCardsIfNeeded(to: menu, context: context) {
             return false
         }
 
@@ -418,6 +386,160 @@ extension StatusItemController {
         }
         menu.addItem(.separator())
         return false
+    }
+
+    private func addCodexAccountCardsIfNeeded(to menu: NSMenu, context: MenuCardContext) -> Bool {
+        guard let codexAccountDisplay = context.codexAccountDisplay, codexAccountDisplay.showAllCards else {
+            return false
+        }
+        let cards: [(CodexAccountDisplay, UsageMenuCardView.Model)] = codexAccountDisplay.accounts
+            .compactMap { account in
+                let subtitleOverride = account.cacheNotice.map {
+                    UsageMenuCardView.Model.SubtitleOverride(text: $0, style: account.isActive ? .error : .info)
+                }
+                guard let model = self.menuCardModel(
+                    for: .codex,
+                    snapshotOverride: account.snapshot,
+                    useStoreSnapshotFallback: false,
+                    errorOverride: nil,
+                    subtitleOverride: subtitleOverride,
+                    accountOverride: AccountInfo(email: account.email, plan: nil),
+                    accountSelectionAction: account.isActive ? nil : { [weak self] in
+                        AntigravityInteractionDebugLog.append(
+                            "codex account selection tapped",
+                            metadata: ["email": account.email])
+                        self?.startSwitchAccount(provider: .codex, targetEmail: account.email)
+                    },
+                    accountSelectionState: account.isActive ? .selected : .unselected)
+                else {
+                    return nil
+                }
+                return (account, model)
+            }
+
+        AntigravityInteractionDebugLog.append(
+            "codex account cards built",
+            metadata: [
+                "count": String(cards.count),
+                "activeEmail": codexAccountDisplay.activeEmail ?? "",
+            ])
+
+        if cards.isEmpty, let model = self.menuCardModel(for: context.selectedProvider) {
+            menu.addItem(self.makeMenuCardItem(
+                UsageMenuCardView(model: model, width: context.menuWidth),
+                id: "menuCard",
+                width: context.menuWidth))
+            menu.addItem(.separator())
+            return true
+        }
+
+        for (index, card) in cards.enumerated() {
+            let id = "menuCard-codex-\(index)"
+            let item = self.makeMenuCardItem(
+                UsageMenuCardView(model: card.1, width: context.menuWidth),
+                id: id,
+                width: context.menuWidth)
+            if !card.0.isActive {
+                item.target = self
+                item.action = #selector(self.runSwitchAccount(_:))
+                item.representedObject = SwitchAccountActionPayload(
+                    provider: .codex,
+                    targetEmail: card.0.email)
+            }
+            menu.addItem(item)
+            if index < cards.count - 1 {
+                menu.addItem(.separator())
+            }
+        }
+        if !cards.isEmpty {
+            menu.addItem(.separator())
+        }
+        return true
+    }
+
+    private func addAntigravityAccountCardsIfNeeded(to menu: NSMenu, context: MenuCardContext) -> Bool {
+        guard let antigravityAccountDisplay = context.antigravityAccountDisplay, antigravityAccountDisplay.showAllCards
+        else {
+            return false
+        }
+        let cards: [(AntigravityAccountDisplay, UsageMenuCardView.Model)] = antigravityAccountDisplay.accounts
+            .compactMap { account in
+                let subtitleOverride = account.cacheNotice.map {
+                    UsageMenuCardView.Model.SubtitleOverride(text: $0, style: account.isActive ? .error : .info)
+                }
+                guard let model = self.menuCardModel(
+                    for: .antigravity,
+                    snapshotOverride: account.snapshot,
+                    useStoreSnapshotFallback: false,
+                    errorOverride: nil,
+                    subtitleOverride: subtitleOverride,
+                    accountOverride: AccountInfo(
+                        email: account.email,
+                        plan: account.snapshot?.loginMethod(for: .antigravity)),
+                    headerActions: account.isActive ? [] : [
+                        UsageMenuCardView.Model.HeaderAction(
+                            id: "delete-\(account.email)",
+                            symbolName: "trash",
+                            accessibilityLabel: "Delete account",
+                            action: { [weak self] in
+                                AntigravityInteractionDebugLog.append(
+                                    "antigravity delete tapped",
+                                    metadata: ["email": account.email])
+                                self?.removeAntigravityAccount(email: account.email)
+                            }),
+                    ],
+                    accountSelectionAction: account.isActive ? nil : { [weak self] in
+                        AntigravityInteractionDebugLog.append(
+                            "antigravity account selection tapped",
+                            metadata: ["email": account.email])
+                        self?.startSwitchAccount(provider: .antigravity, targetEmail: account.email)
+                    },
+                    accountSelectionState: account.isActive ? .selected : .unselected)
+                else {
+                    return nil
+                }
+                return (account, model)
+            }
+
+        AntigravityInteractionDebugLog.append(
+            "antigravity account cards built",
+            metadata: [
+                "count": String(cards.count),
+                "activeEmail": antigravityAccountDisplay.activeEmail ?? "",
+                "emails": cards.map(\.0.email).joined(separator: ","),
+            ])
+
+        if cards.isEmpty, let model = self.menuCardModel(for: context.selectedProvider) {
+            menu.addItem(self.makeMenuCardItem(
+                UsageMenuCardView(model: model, width: context.menuWidth),
+                id: "menuCard",
+                width: context.menuWidth))
+            menu.addItem(.separator())
+            return true
+        }
+
+        for (index, card) in cards.enumerated() {
+            let id = "menuCard-antigravity-\(index)"
+            let item = self.makeMenuCardItem(
+                UsageMenuCardView(model: card.1, width: context.menuWidth),
+                id: id,
+                width: context.menuWidth)
+            if !card.0.isActive {
+                item.target = self
+                item.action = #selector(self.runSwitchAccount(_:))
+                item.representedObject = SwitchAccountActionPayload(
+                    provider: .antigravity,
+                    targetEmail: card.0.email)
+            }
+            menu.addItem(item)
+            if index < cards.count - 1 {
+                menu.addItem(.separator())
+            }
+        }
+        if !cards.isEmpty {
+            menu.addItem(.separator())
+        }
+        return true
     }
 
     private func addOpenAIWebItemsIfNeeded(
@@ -619,6 +741,18 @@ extension StatusItemController {
             showSwitcher: false)
     }
 
+    private func antigravityAccountMenuDisplay(for provider: UsageProvider) -> AntigravityAccountMenuDisplay? {
+        guard provider == .antigravity else { return nil }
+        let accounts = self.store.antigravityAccountDisplays()
+        guard accounts.count > 1 else { return nil }
+        let activeEmail = accounts.first(where: { $0.isActive })?.email
+        return AntigravityAccountMenuDisplay(
+            accounts: accounts,
+            activeEmail: activeEmail,
+            showAllCards: true,
+            showSwitcher: false)
+    }
+
     private func menuNeedsRefresh(_ menu: NSMenu) -> Bool {
         let key = ObjectIdentifier(menu)
         return self.menuVersions[key] != self.menuContentVersion
@@ -710,8 +844,7 @@ extension StatusItemController {
         _ view: some View,
         id: String,
         width: CGFloat,
-        submenu: NSMenu? = nil,
-        onClick: (() -> Void)? = nil) -> NSMenuItem
+        submenu: NSMenu? = nil) -> NSMenuItem
     {
         if !Self.menuCardRenderingEnabled {
             let item = NSMenuItem()
@@ -733,7 +866,7 @@ extension StatusItemController {
         {
             view.environment(\.locale, self.settings.appLocale)
         }
-        let hosting = MenuCardItemHostingView(rootView: wrapped, highlightState: highlightState, onClick: onClick)
+        let hosting = MenuCardItemHostingView(rootView: wrapped, highlightState: highlightState)
         // Set frame with target width immediately
         let height = self.menuCardHeight(for: hosting, width: width)
         hosting.frame = NSRect(origin: .zero, size: NSSize(width: width, height: height))
@@ -954,7 +1087,6 @@ extension StatusItemController {
     private final class MenuCardItemHostingView<Content: View>: NSHostingView<Content>, MenuCardHighlighting,
     MenuCardMeasuring {
         private let highlightState: MenuCardHighlightState
-        private let onClick: (() -> Void)?
         override var allowsVibrancy: Bool {
             true
         }
@@ -965,15 +1097,13 @@ extension StatusItemController {
             return NSSize(width: self.frame.width, height: size.height)
         }
 
-        init(rootView: Content, highlightState: MenuCardHighlightState, onClick: (() -> Void)? = nil) {
+        init(rootView: Content, highlightState: MenuCardHighlightState) {
             self.highlightState = highlightState
-            self.onClick = onClick
             super.init(rootView: rootView)
         }
 
         required init(rootView: Content) {
             self.highlightState = MenuCardHighlightState()
-            self.onClick = nil
             super.init(rootView: rootView)
         }
 
@@ -989,11 +1119,74 @@ extension StatusItemController {
         }
 
         override func mouseDown(with event: NSEvent) {
-            guard let onClick else {
+            let controlHandled = self.shouldHandleByControlSubview(event)
+            self.logInteraction(
+                "menuCard mouseDown",
+                metadata: [
+                    "controlHandled": controlHandled ? "true" : "false",
+                    "hasAction": self.enclosingMenuItem?.action == nil ? "false" : "true",
+                ])
+            if controlHandled {
                 super.mouseDown(with: event)
                 return
             }
-            onClick()
+            if self.triggerMenuItemActionIfPossible() {
+                return
+            }
+            super.mouseDown(with: event)
+        }
+
+        private func shouldHandleByControlSubview(_ event: NSEvent) -> Bool {
+            let point = self.convert(event.locationInWindow, from: nil)
+            guard let hitView = self.hitTest(point) else { return false }
+            var current: NSView? = hitView
+            while let view = current {
+                if view is NSControl {
+                    return true
+                }
+                let className = NSStringFromClass(type(of: view)).lowercased()
+                if className.contains("button") || className.contains("control") {
+                    return true
+                }
+                current = view.superview
+            }
+            return false
+        }
+
+        private func triggerMenuItemActionIfPossible() -> Bool {
+            guard let item = self.enclosingMenuItem,
+                  item.isEnabled,
+                  item.submenu == nil,
+                  item.action != nil,
+                  let menu = item.menu
+            else {
+                self.logInteraction("menuCard action skipped")
+                return false
+            }
+            let index = menu.index(of: item)
+            guard index >= 0 else {
+                self.logInteraction("menuCard action skipped invalid index")
+                return false
+            }
+            self.logInteraction(
+                "menuCard performActionForItem",
+                metadata: [
+                    "index": String(index),
+                    "action": NSStringFromSelector(item.action!),
+                ])
+            menu.performActionForItem(at: index)
+            return true
+        }
+
+        private func logInteraction(_ event: String, metadata: [String: String] = [:]) {
+            guard let item = self.enclosingMenuItem else { return }
+            let identifier = item.identifier?.rawValue ?? ""
+            let represented = item.representedObject as? String ?? ""
+            let id = [identifier, represented].first(where: { !$0.isEmpty }) ?? ""
+            guard id.contains("menuCard-antigravity") else { return }
+            var payload = metadata
+            payload["itemID"] = id
+            AntigravityInteractionDebugLog.append(event, metadata: payload)
         }
 
         func setHighlighted(_ highlighted: Bool) {
@@ -1297,15 +1490,24 @@ extension StatusItemController {
     private func menuCardModel(
         for provider: UsageProvider?,
         snapshotOverride: UsageSnapshot? = nil,
+        useStoreSnapshotFallback: Bool = true,
         errorOverride: String? = nil,
         subtitleOverride: UsageMenuCardView.Model.SubtitleOverride? = nil,
         accountOverride: AccountInfo? = nil,
+        headerActions: [UsageMenuCardView.Model.HeaderAction] = [],
+        accountSelectionAction: (() -> Void)? = nil,
         accountSelectionState: UsageMenuCardView.Model.AccountSelectionState = .none) -> UsageMenuCardView.Model?
     {
         let target = provider ?? self.store.enabledProviders().first ?? .codex
         let metadata = self.store.metadata(for: target)
 
-        let snapshot = snapshotOverride ?? self.store.snapshot(for: target)
+        let snapshot: UsageSnapshot? = if let snapshotOverride {
+            snapshotOverride
+        } else if useStoreSnapshotFallback {
+            self.store.snapshot(for: target)
+        } else {
+            nil
+        }
         let credits: CreditsSnapshot?
         let creditsError: String?
         let dashboard: OpenAIDashboardSnapshot?
@@ -1355,7 +1557,9 @@ extension StatusItemController {
             hidePersonalInfo: self.settings.hidePersonalInfo,
             now: Date(),
             subtitleOverride: subtitleOverride,
-            accountSelectionState: accountSelectionState)
+            accountSelectionState: accountSelectionState,
+            headerActions: headerActions,
+            accountSelectionAction: accountSelectionAction)
         return UsageMenuCardView.Model.make(input)
     }
 

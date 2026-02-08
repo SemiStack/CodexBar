@@ -72,12 +72,21 @@ struct UsageMenuCardView: View {
             let spendLine: String
         }
 
+        struct HeaderAction {
+            let id: String
+            let symbolName: String
+            let accessibilityLabel: String
+            let action: () -> Void
+        }
+
+        let accountSelectionAction: (() -> Void)?
         let providerName: String
         let email: String
         let subtitleText: String
         let subtitleStyle: SubtitleStyle
         let planText: String?
         let accountSelectionState: AccountSelectionState
+        let headerActions: [HeaderAction]
         let metrics: [Metric]
         let creditsText: String?
         let creditsRemaining: Double?
@@ -239,23 +248,14 @@ private struct UsageMenuCardHeaderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(self.model.providerName)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(self.providerTitleColor)
-                Spacer()
-                Text(self.model.email)
-                    .font(.subheadline.weight(self.model.accountSelectionState == .none ? .regular : .semibold))
-                    .foregroundStyle(self.accountNameColor)
-                    .padding(.horizontal, self.model.accountSelectionState == .none ? 0 : 8)
-                    .padding(.vertical, self.model.accountSelectionState == .none ? 0 : 2)
-                    .background {
-                        if self.model.accountSelectionState != .none {
-                            Capsule(style: .continuous)
-                                .fill(self.accountNameBackground)
-                        }
-                    }
+            if let accountSelectionAction = self.model.accountSelectionAction {
+                Button(action: accountSelectionAction) {
+                    self.headerTopRow
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+            } else {
+                self.headerTopRow
             }
             let subtitleAlignment: VerticalAlignment = self.model.subtitleStyle == .error ? .top : .firstTextBaseline
             HStack(alignment: subtitleAlignment) {
@@ -271,6 +271,18 @@ private struct UsageMenuCardHeaderView: View {
                 if self.model.subtitleStyle == .error, !self.model.subtitleText.isEmpty {
                     CopyIconButton(copyText: self.model.subtitleText, isHighlighted: self.isHighlighted)
                 }
+                ForEach(self.model.headerActions, id: \.id) { action in
+                    Button {
+                        action.action()
+                    } label: {
+                        Image(systemName: action.symbolName)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                            .frame(width: 18, height: 18)
+                    }
+                    .buttonStyle(CopyIconButtonStyle(isHighlighted: self.isHighlighted))
+                    .accessibilityLabel(action.accessibilityLabel.appLocalized)
+                }
                 switch self.model.accountSelectionState {
                 case .none:
                     EmptyView()
@@ -279,9 +291,19 @@ private struct UsageMenuCardHeaderView: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(self.model.progressColor)
                 case .unselected:
-                    Image(systemName: "circle")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                    if let accountSelectionAction = self.model.accountSelectionAction {
+                        Button(action: accountSelectionAction) {
+                            Image(systemName: "circle")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                        }
+                        .buttonStyle(CopyIconButtonStyle(isHighlighted: self.isHighlighted))
+                        .accessibilityLabel("Switch account".appLocalized)
+                    } else {
+                        Image(systemName: "circle")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                    }
                 }
                 if let plan = self.model.planText {
                     Text(plan)
@@ -290,6 +312,27 @@ private struct UsageMenuCardHeaderView: View {
                         .lineLimit(1)
                 }
             }
+        }
+    }
+
+    private var headerTopRow: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(self.model.providerName)
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundStyle(self.providerTitleColor)
+            Spacer()
+            Text(self.model.email)
+                .font(.subheadline.weight(self.model.accountSelectionState == .none ? .regular : .semibold))
+                .foregroundStyle(self.accountNameColor)
+                .padding(.horizontal, self.model.accountSelectionState == .none ? 0 : 8)
+                .padding(.vertical, self.model.accountSelectionState == .none ? 0 : 2)
+                .background {
+                    if self.model.accountSelectionState != .none {
+                        Capsule(style: .continuous)
+                            .fill(self.accountNameBackground)
+                    }
+                }
         }
     }
 
@@ -707,6 +750,8 @@ extension UsageMenuCardView.Model {
         let now: Date
         let subtitleOverride: SubtitleOverride?
         let accountSelectionState: AccountSelectionState
+        let headerActions: [HeaderAction]
+        let accountSelectionAction: (() -> Void)?
 
         init(
             provider: UsageProvider,
@@ -728,7 +773,9 @@ extension UsageMenuCardView.Model {
             hidePersonalInfo: Bool,
             now: Date,
             subtitleOverride: SubtitleOverride? = nil,
-            accountSelectionState: AccountSelectionState = .none)
+            accountSelectionState: AccountSelectionState = .none,
+            headerActions: [HeaderAction] = [],
+            accountSelectionAction: (() -> Void)? = nil)
         {
             self.provider = provider
             self.metadata = metadata
@@ -750,6 +797,8 @@ extension UsageMenuCardView.Model {
             self.now = now
             self.subtitleOverride = subtitleOverride
             self.accountSelectionState = accountSelectionState
+            self.headerActions = headerActions
+            self.accountSelectionAction = accountSelectionAction
         }
     }
 
@@ -785,12 +834,14 @@ extension UsageMenuCardView.Model {
             : nil
 
         return UsageMenuCardView.Model(
+            accountSelectionAction: input.accountSelectionAction,
             providerName: input.metadata.displayName,
             email: redacted.email,
             subtitleText: redacted.subtitleText,
             subtitleStyle: subtitle.style,
             planText: planText,
             accountSelectionState: input.accountSelectionState,
+            headerActions: input.headerActions,
             metrics: metrics,
             creditsText: creditsText,
             creditsRemaining: input.provider == .codex ? nil : input.credits?.remaining,
@@ -806,10 +857,12 @@ extension UsageMenuCardView.Model {
         for provider: UsageProvider,
         snapshot: UsageSnapshot?,
         account: AccountInfo,
-        metadata: ProviderMetadata) -> String
+        metadata: ProviderMetadata,
+        accountSelectionState: AccountSelectionState) -> String
     {
         if let email = snapshot?.accountEmail(for: provider), !email.isEmpty { return email }
-        if metadata.usesAccountFallback,
+        let allowsAccountFallback = metadata.usesAccountFallback || accountSelectionState != .none
+        if allowsAccountFallback,
            let email = account.email, !email.isEmpty
         {
             return email
@@ -878,7 +931,8 @@ extension UsageMenuCardView.Model {
                 for: input.provider,
                 snapshot: input.snapshot,
                 account: input.account,
-                metadata: input.metadata),
+                metadata: input.metadata,
+                accountSelectionState: input.accountSelectionState),
             isEnabled: input.hidePersonalInfo)
         let subtitleText = PersonalInfoRedactor.redactEmails(in: subtitle.text, isEnabled: input.hidePersonalInfo)
             ?? subtitle.text

@@ -69,6 +69,8 @@ final class StatusItemController: NSObject, NSMenuDelegate, StatusItemControllin
         }
     }
 
+    var antigravityRemovalInFlightEmails: Set<String> = []
+
     var blinkStates: [UsageProvider: BlinkState] = [:]
     var blinkAmounts: [UsageProvider: CGFloat] = [:]
     var wiggleAmounts: [UsageProvider: CGFloat] = [:]

@@ -100,6 +100,8 @@ extension UsageStore {
 
         if provider == .codex {
             self.refreshCodexAccountCacheFromLiveData()
+        } else if provider == .antigravity {
+            self.refreshAntigravityAccountCacheFromLiveData()
         }
     }
 }
